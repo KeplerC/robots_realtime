@@ -740,25 +740,150 @@ class XdofSimNode(Node):
                 # No viser — create standalone renderer lazily for recording.
                 frames = self._render_standalone(ts)
 
-            if self._recording and frames:
-                for cam_name, frame in frames.items():
-                    w = self._cam_writers.get(cam_name)
-                    if w is not None and w.is_open:
-                        w.write("rgb", ts, {"frame": frame})
-                    self.publish(cam_name, {"frame": frame}, ts=ts)
+            if frames:
+                enriched = self._enrich_camera_frames(frames)
+                for cam_name, cam_msg in enriched.items():
+                    self.publish(cam_name, cam_msg, ts=ts)
+                    if self._recording:
+                        w = self._cam_writers.get(cam_name)
+                        if w is not None and w.is_open:
+                            w.write("rgb", ts, {"frame": frames[cam_name]})
 
             elapsed = time.monotonic() - t0
             remaining = interval - elapsed
             if remaining > 3e-4:
                 time.sleep(remaining - 1e-4)
 
-        if self._standalone_renderer is not None:
-            try:
-                self._standalone_renderer.close()
-            except Exception:
-                pass
+        for r in (self._standalone_renderer, self._depth_renderer):
+            if r is not None:
+                try:
+                    r.close()
+                except Exception:
+                    pass
 
     _standalone_renderer: Any = None
+    _depth_renderer: Any = None
+
+    # ------------------------------------------------------------------
+    # Camera enrichment (depth, intrinsics, extrinsic pose)
+    # ------------------------------------------------------------------
+
+    def _ensure_depth_renderer(self) -> Any:
+        """Lazily create a separate MuJoCo renderer for depth maps."""
+        if self._depth_renderer is not None:
+            return self._depth_renderer
+        env = self._env
+        if env is None:
+            return None
+        try:
+            import mujoco
+            self._depth_renderer = mujoco.Renderer(
+                env.model,
+                height=env._camera_height,
+                width=env._camera_width,
+            )
+        except Exception as exc:
+            logger.warning("[%s] could not create depth renderer: %s", self.name, exc)
+        return self._depth_renderer
+
+    def _render_depth(self, cam_name: str) -> np.ndarray | None:
+        """Render metric depth for a named camera. Returns float32 (H,W) in meters."""
+        renderer = self._ensure_depth_renderer()
+        if renderer is None:
+            return None
+        env = self._env
+        try:
+            import mujoco
+            renderer.update_scene(env.data, camera=cam_name)
+            renderer.enable_depth_rendering()
+            zbuf = renderer.render().copy()  # float32 [0, 1]
+            renderer.disable_depth_rendering()
+
+            # Convert OpenGL z-buffer to metric depth
+            extent = env.model.stat.extent
+            near = env.model.vis.map.znear * extent
+            far = env.model.vis.map.zfar * extent
+            # Avoid division by zero for pixels at far plane
+            denom = far - (far - near) * zbuf
+            denom = np.clip(denom, 1e-6, None)
+            depth_m = (near * far / denom).astype(np.float32)
+            return depth_m
+        except Exception as exc:
+            logger.warning("[%s] depth render failed for %s: %s", self.name, cam_name, exc)
+            return None
+
+    def _compute_intrinsics(self, cam_name: str) -> np.ndarray | None:
+        """Compute pinhole intrinsics from MuJoCo camera fovy."""
+        env = self._env
+        if env is None:
+            return None
+        try:
+            import mujoco
+            cam_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_CAMERA, cam_name)
+            if cam_id < 0:
+                return None
+            fovy_rad = np.deg2rad(env.model.cam_fovy[cam_id])
+            height = env._camera_height
+            width = env._camera_width
+            fy = height / (2.0 * np.tan(fovy_rad / 2.0))
+            fx = fy  # square pixels
+            cx, cy = width / 2.0, height / 2.0
+            return np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=np.float32)
+        except Exception as exc:
+            logger.warning("[%s] intrinsics failed for %s: %s", self.name, cam_name, exc)
+            return None
+
+    def _compute_camera_pose(self, cam_name: str) -> np.ndarray | None:
+        """Compute 4x4 camera extrinsic (world-from-camera) in OpenCV convention."""
+        env = self._env
+        if env is None:
+            return None
+        try:
+            import mujoco
+            cam_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_CAMERA, cam_name)
+            if cam_id < 0:
+                return None
+            pos = env.data.cam_xpos[cam_id].copy()
+            rot = env.data.cam_xmat[cam_id].reshape(3, 3).copy()
+
+            # MuJoCo camera: -Z forward, +X right, +Y down
+            # OpenCV camera: +Z forward, +X right, +Y down
+            # Negate Z column of rotation to flip forward direction
+            rot_cv = rot.copy()
+            rot_cv[:, 2] *= -1
+
+            pose_mat = np.eye(4, dtype=np.float32)
+            pose_mat[:3, :3] = rot_cv
+            pose_mat[:3, 3] = pos
+            return pose_mat
+        except Exception:
+            return None
+
+    def _enrich_camera_frames(self, frames: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        """Wrap raw RGB frames with depth, intrinsics, and extrinsic pose.
+
+        Input:  {cam_name: np.uint8(H,W,3)}
+        Output: {cam_name: {"images": {"left_rgb": rgb}, "depth_data": depth, ...}}
+        """
+        enriched: dict[str, dict[str, Any]] = {}
+        for cam_name, rgb_frame in frames.items():
+            msg: dict[str, Any] = {
+                "images": {"left_rgb": rgb_frame},
+            }
+            depth = self._render_depth(cam_name)
+            if depth is not None:
+                msg["depth_data"] = depth
+
+            K = self._compute_intrinsics(cam_name)
+            if K is not None:
+                msg["intrinsics"] = {"left": {"intrinsics_matrix": K}}
+
+            pose_mat = self._compute_camera_pose(cam_name)
+            if pose_mat is not None:
+                msg["pose_mat"] = pose_mat
+
+            enriched[cam_name] = msg
+        return enriched
 
     def _render_standalone(self, ts: float) -> dict[str, Any]:
         """Render cameras without viser (used when viser_port=None)."""

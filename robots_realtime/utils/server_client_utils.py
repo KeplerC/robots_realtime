@@ -94,11 +94,23 @@ class MsgpackNumpyClient:
 
 
 class SyncMsgpackNumpyClient:
-    def __init__(self, host="0.0.0.0", port=9000):
+    def __init__(self, host="0.0.0.0", port=9000, retry_interval=2.0, timeout=300.0):
+        import time as _time
+
         self._client = MsgpackNumpyClient(host, port)
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
-        self._loop.run_until_complete(self._client.connect())
+
+        deadline = _time.time() + timeout
+        while True:
+            try:
+                self._loop.run_until_complete(self._client.connect())
+                break
+            except (ConnectionRefusedError, OSError) as e:
+                if _time.time() >= deadline:
+                    raise
+                print(f"[CLIENT] Waiting for server on {host}:{port}... ({e})")
+                _time.sleep(retry_interval)
 
     def send_request(self, data: dict) -> dict:
         return self._loop.run_until_complete(self._client.send_request(data))

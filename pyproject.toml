@@ -79,7 +79,7 @@ include = ["robots_realtime*"]
 exclude = ["configs*"]
 
 [project.urls]
-Repository = "https://github.com/uynitsuj/robots_realtime"
+Repository = "https://github.com/KeplerC/robots_realtime"
 
 [tool.flit.module]
 name = "robots_realtime"
