@@ -58,7 +58,7 @@ class ViserTeleopNode(Node):
     """
 
     role = NodeRole.CONTROLLER
-    published_topics: list[str] = ["joint_pos"]
+    published_topics: list[str] = ["joint_pos", "left_joint_pos", "right_joint_pos"]
     subscriber_driven: bool = False
 
     def __init__(
@@ -128,10 +128,17 @@ class ViserTeleopNode(Node):
         # agent.act() sets agent.obs (drives visualization) and returns IK targets.
         action = self._agent.act(state_obs)
 
-        # Publish joint commands.
-        pos = self._extract_pos(action)
-        if pos is not None:
-            self.publish("joint_pos", {"joint_pos": pos}, ts=ts)
+        # Publish joint commands — per-arm if bimanual, single if not.
+        if isinstance(action, dict) and any(k in action for k in ("left", "right")):
+            for arm_key in ("left", "right"):
+                arm = action.get(arm_key)
+                if arm is not None:
+                    pos = np.asarray(arm["pos"] if isinstance(arm, dict) else arm, dtype=np.float32)
+                    self.publish(f"{arm_key}_joint_pos", {"joint_pos": pos}, ts=ts)
+        else:
+            pos = self._extract_pos(action)
+            if pos is not None:
+                self.publish("joint_pos", {"joint_pos": pos}, ts=ts)
 
     def cleanup(self) -> None:
         if self._agent is not None and hasattr(self._agent, "close"):

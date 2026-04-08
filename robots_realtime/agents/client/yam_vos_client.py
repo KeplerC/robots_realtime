@@ -179,26 +179,36 @@ class YamVosClientAgent(Agent):
             import traceback; traceback.print_exc()
             raise
 
-        if response.get(b"left") is not None:
-            self.vos_joint_pos = np.asarray(response[b"left"].get(b"joint_pos"), dtype=np.float32)
-            self.vos_gripper_pos = np.asarray(response[b"left"].get(b"gripper"), dtype=np.float32)
+        # Process per-arm responses
+        action: Dict[str, Dict[str, np.ndarray]] = {}
+        for arm_key in ["left", "right"]:
+            arm_resp = response.get(arm_key.encode())
+            if arm_resp is not None:
+                vos_jp = np.asarray(arm_resp.get(b"joint_pos"), dtype=np.float32)
+                vos_grip = float(np.asarray(arm_resp.get(b"gripper"), dtype=np.float32))
+                gripper_act = vos_grip * 0.0475  # fraction → meters
+                action[arm_key] = {"pos": np.concatenate([vos_jp, [gripper_act]])}
 
-        # Default: use IK targets from Viser gizmo (6 joints) + gripper
-        left_joints = np.asarray(self.ik.joints["left"], dtype=np.float32)
-        gripper_val = self.left_gripper_slider.value * 0.0475  # fraction → meters
-        left_target = np.concatenate([left_joints, [gripper_val]])
-        action: Dict[str, Dict[str, np.ndarray]] = {"left": {"pos": left_target}}
+                # Store for visualization
+                if arm_key == "left":
+                    self.vos_joint_pos = vos_jp
+                    self.vos_gripper_pos = np.float32(vos_grip)
 
-        # Override with vOS response if available
-        if response.get(b"left") is not None:
-            gripper_act = float(self.vos_gripper_pos) * 0.0475  # fraction → meters
-            action = {
-                "left": {"pos": np.concatenate([self.vos_joint_pos, [gripper_act]])}
-            }
+        # Fallback: if no vOS response for an arm, use IK gizmo (left only)
+        if "left" not in action:
+            left_joints = np.asarray(self.ik.joints["left"], dtype=np.float32)
+            gripper_val = self.left_gripper_slider.value * 0.0475
+            action["left"] = {"pos": np.concatenate([left_joints, [gripper_val]])}
+        if "right" not in action:
+            # Hold right arm at current position (read from obs)
+            right_obs = self.obs.get("right")
+            if right_obs and "joint_pos" in right_obs:
+                action["right"] = {"pos": np.asarray(right_obs["joint_pos"], dtype=np.float32)}
 
         return action
 
     def action_spec(self) -> Dict[str, Dict[str, Array]]:
         return {
-            "left": {"pos": Array(shape=(7,), dtype=np.float32)},  # 6 joints + 1 gripper
+            "left": {"pos": Array(shape=(7,), dtype=np.float32)},
+            "right": {"pos": Array(shape=(7,), dtype=np.float32)},
         }
