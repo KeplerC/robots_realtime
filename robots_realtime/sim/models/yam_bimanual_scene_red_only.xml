@@ -119,56 +119,7 @@
     </body>
     <geom name="table_plane" type="plane" size="0.2975 0.65 0.01" pos="0.6 0 0.75" rgba="0 0 0 0" group="3"/>
 
-    <!-- ==================== TASK OBJECTS: Bottle Task ==================== -->
-    <!-- 6 plastic bottles scattered on the table (matching xdof training data variety) -->
-
-    <!-- Bottle 1: Green, lying on side along Y -->
-    <body name="bottle_1" pos="0.50 0.12 0.78" quat="0.707 0.707 0 0">
-      <freejoint name="bottle_1_joint"/>
-      <geom name="b1_body" type="cylinder" size="0.027 0.07"
-        pos="0 0 0" rgba="0.3 0.7 0.2 1.0" mass="0.015"
-        friction="3.0 0.1 0.01" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="b1_neck" type="cylinder" size="0.011 0.015"
-        pos="0 0 0.085" rgba="0.35 0.75 0.25 1.0" mass="0.01"/>
-      <geom name="b1_cap" type="cylinder" size="0.013 0.007"
-        pos="0 0 0.107" rgba="0.2 0.6 0.15 1.0" mass="0.005"/>
-    </body>
-
-    <!-- Bottle 2: Blue, lying on side along X -->
-    <body name="bottle_2" pos="0.45 -0.08 0.78" quat="0.707 0 0.707 0">
-      <freejoint name="bottle_2_joint"/>
-      <geom name="b2_body" type="cylinder" size="0.027 0.07"
-        pos="0 0 0" rgba="0.2 0.3 0.9 1.0" mass="0.015"
-        friction="3.0 0.1 0.01" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="b2_neck" type="cylinder" size="0.011 0.015"
-        pos="0 0 0.085" rgba="0.25 0.35 0.95 1.0" mass="0.01"/>
-      <geom name="b2_cap" type="cylinder" size="0.013 0.007"
-        pos="0 0 0.107" rgba="0.15 0.2 0.8 1.0" mass="0.005"/>
-    </body>
-
-    <!-- Bottle 3: Clear/transparent, lying on side along Y -->
-    <body name="bottle_3" pos="0.55 0.28 0.78" quat="0.707 0.707 0 0">
-      <freejoint name="bottle_3_joint"/>
-      <geom name="b3_body" type="cylinder" size="0.027 0.07"
-        pos="0 0 0" rgba="0.85 0.9 0.85 1.0" mass="0.015"
-        friction="3.0 0.1 0.01" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="b3_neck" type="cylinder" size="0.011 0.015"
-        pos="0 0 0.085" rgba="0.88 0.92 0.88 1.0" mass="0.01"/>
-      <geom name="b3_cap" type="cylinder" size="0.013 0.007"
-        pos="0 0 0.107" rgba="0.3 0.6 0.3 1.0" mass="0.005"/>
-    </body>
-
-    <!-- Bottle 4: Orange/yellow, lying on side along Y -->
-    <body name="bottle_4" pos="0.45 0.18 0.78" quat="0.707 0.707 0 0">
-      <freejoint name="bottle_4_joint"/>
-      <geom name="b4_body" type="cylinder" size="0.027 0.07"
-        pos="0 0 0" rgba="0.95 0.6 0.1 1.0" mass="0.015"
-        friction="3.0 0.1 0.01" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="b4_neck" type="cylinder" size="0.011 0.015"
-        pos="0 0 0.085" rgba="0.98 0.65 0.15 1.0" mass="0.01"/>
-      <geom name="b4_cap" type="cylinder" size="0.013 0.007"
-        pos="0 0 0.107" rgba="0.9 0.5 0.05 1.0" mass="0.005"/>
-    </body>
+    <!-- ==================== TASK OBJECTS: Single red bottle ==================== -->
 
     <!-- Bottle 5: Red, lying on side along X -->
     <body name="bottle_5" pos="0.58 -0.22 0.78" quat="0.707 0 0.707 0">
@@ -180,64 +131,6 @@
         pos="0 0 0.085" rgba="0.9 0.2 0.15 1.0" mass="0.01"/>
       <geom name="b5_cap" type="cylinder" size="0.013 0.007"
         pos="0 0 0.107" rgba="0.75 0.1 0.05 1.0" mass="0.005"/>
-    </body>
-
-    <!-- Bottle 6: Teal/cyan, lying on side along X -->
-    <body name="bottle_6" pos="0.48 -0.15 0.78" quat="0.707 0 0.707 0">
-      <freejoint name="bottle_6_joint"/>
-      <geom name="b6_body" type="cylinder" size="0.027 0.07"
-        pos="0 0 0" rgba="0.1 0.65 0.7 1.0" mass="0.015"
-        friction="3.0 0.1 0.01" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="b6_neck" type="cylinder" size="0.011 0.015"
-        pos="0 0 0.085" rgba="0.15 0.7 0.75 1.0" mass="0.01"/>
-      <geom name="b6_cap" type="cylinder" size="0.013 0.007"
-        pos="0 0 0.107" rgba="0.05 0.55 0.6 1.0" mass="0.005"/>
-    </body>
-
-    <!-- Wide shallow orange bucket (dodecagonal, 12 walls, apothem=0.12, h=12cm) matching real training data -->
-    <body name="bin_container" pos="0.70 0.0 0.76">
-      <freejoint name="bin_joint"/>
-      <!-- Bottom disc (wider) -->
-      <geom name="bin_bottom" type="cylinder" size="0.13 0.003"
-        pos="0 0 0" rgba="0.95 0.55 0.15 1" mass="0.4"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <!-- Dodecagonal walls (12 segments, apothem=0.12, 8mm thick, 12cm tall) -->
-      <geom name="bin_wall_0" type="box" size="0.008 0.033 0.09"
-        pos="0.120 0 0.093" quat="1 0 0 0" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="bin_wall_30" type="box" size="0.008 0.033 0.09"
-        pos="0.104 0.060 0.093" quat="0.9659 0 0 0.2588" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="bin_wall_60" type="box" size="0.008 0.033 0.09"
-        pos="0.060 0.104 0.093" quat="0.8660 0 0 0.5" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="bin_wall_90" type="box" size="0.008 0.033 0.09"
-        pos="0 0.120 0.093" quat="0.7071 0 0 0.7071" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="bin_wall_120" type="box" size="0.008 0.033 0.09"
-        pos="-0.060 0.104 0.093" quat="0.5 0 0 0.8660" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="bin_wall_150" type="box" size="0.008 0.033 0.09"
-        pos="-0.104 0.060 0.093" quat="0.2588 0 0 0.9659" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="bin_wall_180" type="box" size="0.008 0.033 0.09"
-        pos="-0.120 0 0.093" quat="0 0 0 1" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="bin_wall_210" type="box" size="0.008 0.033 0.09"
-        pos="-0.104 -0.060 0.093" quat="-0.2588 0 0 0.9659" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="bin_wall_240" type="box" size="0.008 0.033 0.09"
-        pos="-0.060 -0.104 0.093" quat="-0.5 0 0 0.8660" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="bin_wall_270" type="box" size="0.008 0.033 0.09"
-        pos="0 -0.120 0.093" quat="-0.7071 0 0 0.7071" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="bin_wall_300" type="box" size="0.008 0.033 0.09"
-        pos="0.060 -0.104 0.093" quat="-0.8660 0 0 0.5" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
-      <geom name="bin_wall_330" type="box" size="0.008 0.033 0.09"
-        pos="0.104 -0.060 0.093" quat="-0.9659 0 0 0.2588" rgba="0.95 0.55 0.15 1"
-        friction="1.5 0.005 0.001" condim="6" solref="0.004 1" solimp="0.998 0.998 0.001"/>
     </body>
 
     <!-- ==================== LEFT ARM ==================== -->
@@ -531,17 +424,10 @@
     <position class="finger" name="right_gripper" joint="right_left_finger"/>
   </actuator>
 
-  <!-- Home keyframe: both arms at default position + task objects at initial poses -->
-  <!-- qpos order (MuJoCo body-tree order): 6 bottle freejoints (7 each), bin freejoint (7), then 16 arm joints -->
+  <!-- Home keyframe: red bottle freejoint (7) + 16 arm joints = 23 qpos -->
   <keyframe>
     <key name="home"
-      qpos="0.50 0.12 0.78 0.707 0.707 0 0
-            0.45 -0.08 0.78 0.707 0 0.707 0
-            0.55 0.28 0.78 0.707 0.707 0 0
-            0.45 0.18 0.78 0.707 0.707 0 0
-            0.58 -0.22 0.78 0.707 0 0.707 0
-            0.48 -0.15 0.78 0.707 0 0.707 0
-            0.70 0.0 0.76 1 0 0 0
+      qpos="0.58 -0.22 0.78 0.707 0 0.707 0
             0 1.047 1.047 0 0 0 0 0  0 1.047 1.047 0 0 0 0 0"
       ctrl="0 1.047 1.047 0 0 0 0  0 1.047 1.047 0 0 0 0"/>
   </keyframe>

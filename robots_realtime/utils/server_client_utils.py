@@ -95,25 +95,38 @@ class MsgpackNumpyClient:
 
 class SyncMsgpackNumpyClient:
     def __init__(self, host="0.0.0.0", port=9000, retry_interval=2.0, timeout=300.0):
-        import time as _time
-
-        self._client = MsgpackNumpyClient(host, port)
+        self._host = host
+        self._port = port
+        self._retry_interval = retry_interval
+        self._timeout = timeout
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
+        self._client = MsgpackNumpyClient(host, port)
+        self._connect_with_retry()
 
-        deadline = _time.time() + timeout
+    def _connect_with_retry(self):
+        import time as _time
+        deadline = _time.time() + self._timeout
         while True:
             try:
+                self._client = MsgpackNumpyClient(self._host, self._port)
                 self._loop.run_until_complete(self._client.connect())
-                break
+                return
             except (ConnectionRefusedError, OSError) as e:
                 if _time.time() >= deadline:
                     raise
-                print(f"[CLIENT] Waiting for server on {host}:{port}... ({e})")
-                _time.sleep(retry_interval)
+                print(f"[CLIENT] Waiting for server on {self._host}:{self._port}... ({e})")
+                _time.sleep(self._retry_interval)
 
     def send_request(self, data: dict) -> dict:
-        return self._loop.run_until_complete(self._client.send_request(data))
+        import time as _time
+        try:
+            return self._loop.run_until_complete(self._client.send_request(data))
+        except (ConnectionResetError, BrokenPipeError, asyncio.IncompleteReadError,
+                OSError, AttributeError):
+            print(f"[CLIENT] Connection lost, reconnecting to {self._host}:{self._port}...")
+            self._connect_with_retry()
+            return self._loop.run_until_complete(self._client.send_request(data))
 
     def close(self):
         self._loop.run_until_complete(self._client.close())

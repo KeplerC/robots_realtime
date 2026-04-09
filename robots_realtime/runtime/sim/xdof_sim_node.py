@@ -525,6 +525,7 @@ class XdofSimNode(Node):
             physics_dt=self._physics_dt,
             control_decimation=self._control_decimation,
         )
+
         with self._cmd_lock:
             self._cmd = np.array(self._env.get_init_q(), dtype=np.float64)
         self._env.reset()
@@ -794,19 +795,14 @@ class XdofSimNode(Node):
         env = self._env
         try:
             import mujoco
+
             renderer.update_scene(env.data, camera=cam_name)
             renderer.enable_depth_rendering()
-            zbuf = renderer.render().copy()  # float32 [0, 1]
+            # MuJoCo ≥3.x Renderer.render() already converts the OpenGL
+            # z-buffer to metric depth internally (reverse-Z projection).
+            # No additional conversion is needed.
+            depth_m = renderer.render().copy()
             renderer.disable_depth_rendering()
-
-            # Convert OpenGL z-buffer to metric depth
-            extent = env.model.stat.extent
-            near = env.model.vis.map.znear * extent
-            far = env.model.vis.map.zfar * extent
-            # Avoid division by zero for pixels at far plane
-            denom = far - (far - near) * zbuf
-            denom = np.clip(denom, 1e-6, None)
-            depth_m = (near * far / denom).astype(np.float32)
             return depth_m
         except Exception as exc:
             logger.warning("[%s] depth render failed for %s: %s", self.name, cam_name, exc)
@@ -846,10 +842,11 @@ class XdofSimNode(Node):
             pos = env.data.cam_xpos[cam_id].copy()
             rot = env.data.cam_xmat[cam_id].reshape(3, 3).copy()
 
-            # MuJoCo camera: -Z forward, +X right, +Y down
-            # OpenCV camera: +Z forward, +X right, +Y down
-            # Negate Z column of rotation to flip forward direction
+            # MuJoCo camera: +X right, +Y up,   -Z forward (toward viewer)
+            # OpenCV camera: +X right, +Y down, +Z forward
+            # Negate both Y and Z columns to convert (keeps det=+1)
             rot_cv = rot.copy()
+            rot_cv[:, 1] *= -1
             rot_cv[:, 2] *= -1
 
             pose_mat = np.eye(4, dtype=np.float32)

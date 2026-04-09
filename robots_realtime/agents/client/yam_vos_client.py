@@ -11,7 +11,6 @@ from __future__ import annotations
 import os
 import threading
 import time
-from copy import deepcopy
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -150,7 +149,7 @@ class YamVosClientAgent(Agent):
     # ------------------------------------------------------------------
 
     def act(self, obs: Dict[str, Any]) -> Dict[str, Dict[str, np.ndarray]]:
-        self.obs = deepcopy(obs)
+        self.obs = dict(obs)
 
         # Enrich camera observations with pose/pose_mat if available
         for cam_key, cam_obs in self.obs.items():
@@ -175,19 +174,19 @@ class YamVosClientAgent(Agent):
         try:
             response = self.vos_client.send_request(self.obs)
         except Exception as e:
-            print(f"[YamVosClient] send_request failed: {e}")
-            import traceback; traceback.print_exc()
-            raise
+            print(f"[YamVosClient] send_request failed (falling back to IK): {e}")
+            response = {}
 
         # Process per-arm responses
         action: Dict[str, Dict[str, np.ndarray]] = {}
         for arm_key in ["left", "right"]:
-            arm_resp = response.get(arm_key.encode())
+            arm_resp = response.get(arm_key.encode()) if response else None
             if arm_resp is not None:
                 vos_jp = np.asarray(arm_resp.get(b"joint_pos"), dtype=np.float32)
                 vos_grip = float(np.asarray(arm_resp.get(b"gripper"), dtype=np.float32))
-                gripper_act = vos_grip * 0.0475  # fraction → meters
-                action[arm_key] = {"pos": np.concatenate([vos_jp, [gripper_act]])}
+                # vos_grip is a 0-1 fraction; the sim env multiplies by
+                # _GRIPPER_CTRL_MAX internally, so pass the fraction directly.
+                action[arm_key] = {"pos": np.concatenate([vos_jp, [vos_grip]])}
 
                 # Store for visualization
                 if arm_key == "left":
