@@ -76,6 +76,10 @@ class RobotNode(Node):
         cmd_topic: str | None = None,
         robot_config: str | None = None,
         poll_freq: float | None = None,
+        startup_joint_pos: list[float] | None = None,
+        startup_duration_s: float = 2.0,
+        shutdown_joint_pos: list[float] | None = None,
+        shutdown_duration_s: float = 2.0,
         writer=None,
         **kwargs,
     ) -> None:
@@ -88,6 +92,10 @@ class RobotNode(Node):
         self._robot = robot
         self._cmd_topic = cmd_topic
         self._robot_config = robot_config  # stored for reference; instantiation is caller's job
+        self._startup_joint_pos = startup_joint_pos
+        self._startup_duration_s = startup_duration_s
+        self._shutdown_joint_pos = shutdown_joint_pos
+        self._shutdown_duration_s = shutdown_duration_s
 
     def setup(self) -> None:
         if self._robot is None:
@@ -97,6 +105,11 @@ class RobotNode(Node):
                     f"(robot_config={self._robot_config!r})"
                 )
             self._robot = _instantiate_from_target_yaml(self._robot_config)
+
+        if self._startup_joint_pos is not None:
+            print(f"[{self.name}] Moving to startup pose over {self._startup_duration_s:.1f}s")
+            self._move_to_pose(self._startup_joint_pos, self._startup_duration_s)
+            print(f"[{self.name}] Startup pose reached")
 
     def step(self) -> None:
         ts = time.time()
@@ -122,8 +135,29 @@ class RobotNode(Node):
         self.publish("joint_state", self._robot.get_observations(), ts=ts)
 
     def cleanup(self) -> None:
+        if self._shutdown_joint_pos is not None and self._robot is not None:
+            print(f"[{self.name}] Parking at shutdown pose over {self._shutdown_duration_s:.1f}s")
+            try:
+                self._move_to_pose(self._shutdown_joint_pos, self._shutdown_duration_s)
+                print(f"[{self.name}] Shutdown pose reached")
+            except Exception as exc:
+                print(f"[{self.name}] Failed to park at shutdown pose: {exc}")
+
         if hasattr(self._robot, "stop"):
             self._robot.stop()
+
+    def _move_to_pose(self, target: list[float], duration_s: float) -> None:
+        """Smoothly interpolate robot to target joint position."""
+        target_arr = np.asarray(target, dtype=np.float64)
+        if hasattr(self._robot, "move_joints"):
+            self._robot.move_joints(target_arr, time_interval_s=duration_s)
+        else:
+            current = np.asarray(self._robot.get_joint_pos(), dtype=np.float64)
+            steps = max(1, int(duration_s * 25))
+            for i in range(steps + 1):
+                alpha = i / steps
+                self._robot.command_joint_pos((1.0 - alpha) * current + alpha * target_arr)
+                time.sleep(duration_s / steps)
 
     @classmethod
     def build_kwargs(cls, params: dict) -> dict:
@@ -135,4 +169,7 @@ class RobotNode(Node):
         # Pass through poll_freq if specified
         if "poll_freq" in params:
             kwargs["poll_freq"] = params["poll_freq"]
+        for key in ("startup_joint_pos", "startup_duration_s", "shutdown_joint_pos", "shutdown_duration_s"):
+            if key in params:
+                kwargs[key] = params[key]
         return kwargs

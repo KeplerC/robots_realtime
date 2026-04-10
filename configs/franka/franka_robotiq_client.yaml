@@ -26,6 +26,7 @@ nodes:
     name: franka
     robot_config: robot_configs/franka/franka_robotiq_gripper.yaml
     cmd_topic: franka_viser/joint_pos
+    poll_freq: 500
 
   - type: CameraNode
     name: camera_top
