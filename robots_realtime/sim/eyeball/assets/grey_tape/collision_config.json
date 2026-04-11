@@ -1,0 +1,37 @@
+{
+  "visual_mesh": "grey_tape.obj",
+  "collision_meshes": [
+    "grey_tape_collision_0.obj",
+    "grey_tape_collision_1.obj",
+    "grey_tape_collision_2.obj",
+    "grey_tape_collision_3.obj",
+    "grey_tape_collision_4.obj",
+    "grey_tape_collision_5.obj",
+    "grey_tape_collision_6.obj",
+    "grey_tape_collision_7.obj",
+    "grey_tape_collision_8.obj",
+    "grey_tape_collision_9.obj",
+    "grey_tape_collision_10.obj",
+    "grey_tape_collision_11.obj",
+    "grey_tape_collision_12.obj",
+    "grey_tape_collision_13.obj",
+    "grey_tape_collision_14.obj",
+    "grey_tape_collision_15.obj",
+    "grey_tape_collision_16.obj",
+    "grey_tape_collision_17.obj",
+    "grey_tape_collision_18.obj",
+    "grey_tape_collision_19.obj",
+    "grey_tape_collision_20.obj",
+    "grey_tape_collision_21.obj",
+    "grey_tape_collision_22.obj",
+    "grey_tape_collision_23.obj",
+    "grey_tape_collision_24.obj"
+  ],
+  "visual_submeshes": [
+    {
+      "mesh_file": "grey_tape_visual_0.obj",
+      "texture_file": "grey_tape_visual_0.png",
+      "material_name": "grey_tape_mat_0"
+    }
+  ]
+}

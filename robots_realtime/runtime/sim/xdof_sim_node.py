@@ -460,6 +460,9 @@ class XdofSimNode(Node):
         name: str = "yam",
         scene: str = "hybrid",
         task: str = "bottles",
+        eyeball_task: str | None = None,
+        eyeball_xml: str | None = None,
+        eval_seed: int = 0,
         physics_dt: float = 0.0001,
         control_decimation: int = 17,
         camera_fps: float = 30.0,
@@ -471,6 +474,9 @@ class XdofSimNode(Node):
     ) -> None:
         self._scene = scene
         self._task = task
+        self._eyeball_task = eyeball_task
+        self._eyeball_xml = eyeball_xml
+        self._eval_seed = eval_seed
         self._physics_dt = physics_dt
         self._control_decimation = control_decimation
         self._camera_fps = camera_fps
@@ -518,13 +524,23 @@ class XdofSimNode(Node):
         os.environ.setdefault("MUJOCO_GL", "egl")
         import robots_realtime.sim as sim
 
-        self._env = sim.make_env(
-            scene_variant=self._scene,
-            task=self._task,
-            render_cameras=False,
-            physics_dt=self._physics_dt,
-            control_decimation=self._control_decimation,
-        )
+        if self._eyeball_task is not None:
+            self._env = sim.make_eyeball_env(
+                task_name=self._eyeball_task,
+                eyeball_xml=self._eyeball_xml,
+                render_cameras=False,
+                physics_dt=self._physics_dt,
+                control_decimation=self._control_decimation,
+                eval_seed=self._eval_seed,
+            )
+        else:
+            self._env = sim.make_env(
+                scene_variant=self._scene,
+                task=self._task,
+                render_cameras=False,
+                physics_dt=self._physics_dt,
+                control_decimation=self._control_decimation,
+            )
         with self._cmd_lock:
             self._cmd = np.array(self._env.get_init_q(), dtype=np.float64)
         self._env.reset()
@@ -716,11 +732,12 @@ class XdofSimNode(Node):
     def _read_joint_state(self) -> np.ndarray:
         env = self._env
         dim = env.single_timestep_action_dim
+        gripper_max = getattr(env, "_gripper_ctrl_max", _GRIPPER_CTRL_MAX)
         state = np.zeros(dim, dtype=np.float32)
         for i, qpos_idx in enumerate(env._qpos_indices):
             val = float(env.data.qpos[qpos_idx])
             if i in env._gripper_set:
-                val = float(np.clip(val / _GRIPPER_CTRL_MAX, 0.0, 1.0))
+                val = float(np.clip(val / gripper_max, 0.0, 1.0))
             state[i] = val
         return state
 
@@ -791,7 +808,7 @@ class XdofSimNode(Node):
 
     @classmethod
     def build_kwargs(cls, params: dict) -> dict:
-        return {
+        kw = {
             "name": params["name"],
             "scene": params.get("scene", "hybrid"),
             "task": params.get("task", "bottles"),
@@ -802,3 +819,9 @@ class XdofSimNode(Node):
             "viser_port": params.get("viser_port", 8765),
             "vr_port": params.get("vr_port", 8012),
         }
+        # Eyeball task support
+        if "eyeball_task" in params:
+            kw["eyeball_task"] = params["eyeball_task"]
+            kw["eyeball_xml"] = params.get("eyeball_xml")
+            kw["eval_seed"] = params.get("eval_seed", 0)
+        return kw

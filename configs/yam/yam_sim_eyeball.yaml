@@ -1,0 +1,56 @@
+# Eyeball task environments via robots_realtime.
+#
+# Runs any task from eye.mujoco.tasks.TASK_REGISTRY inside the
+# standard robots_realtime node graph.  Requires the `eye` package:
+#
+#   pip install -e /path/to/eyeball
+#
+# Usage:
+#   rr-session configs/yam/yam_sim_eyeball.yaml
+#
+# Available eyeball_task values (see eye.mujoco.tasks.registry):
+#   tape_handover_random, tape_handover_grid,
+#   pick_up_tiger, pick_up_tiger_right_half,
+#   place_plate_in_rack, double_marker_in_cup,
+#   hang_tool_on_pegboard, medical_tray, hang_spoon_on_hook,
+#   tape_handover_camera_ood, tape_handover_visual_ood, ...
+
+version: "1"
+
+session:
+  save_root: recordings
+
+nodes:
+  - type: AgentNode
+    name: gello_left
+    agent_class: robots_realtime.agents.teleoperation.dummy_agent:DummyAgent
+    agent_kwargs:
+      arm: left
+      target_std: 0.3
+      pose_interval: 1.0
+    loop_mode: flat_out
+    publish_freq: 200.0
+
+  - type: AgentNode
+    name: gello_right
+    agent_class: robots_realtime.agents.teleoperation.dummy_agent:DummyAgent
+    agent_kwargs:
+      arm: right
+      target_std: 0.3
+      pose_interval: 1.0
+    loop_mode: flat_out
+    publish_freq: 200.0
+
+  - type: XdofSimNode
+    name: yam
+    eyeball_task: tape_handover_random
+    # eyeball_xml: /path/to/eyeball/eye/mujoco/robot_xmls/eyeball_bimanual_scene.xml
+    eval_seed: 42
+    physics_dt: 0.0005
+    control_decimation: 17
+    camera_fps: 30.0
+    viser_port: 8765
+    vr_port: 8012
+    cmd_topics:
+      left: gello_left/joint_pos
+      right: gello_right/joint_pos

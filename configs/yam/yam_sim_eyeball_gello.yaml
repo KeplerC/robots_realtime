@@ -1,0 +1,46 @@
+# Eyeball task with GELLO teleoperation leaders.
+#
+# Requires:
+#   - eye package: pip install -e /path/to/eyeball
+#   - Two GELLO leader arms connected via USB
+#
+# Usage:
+#   rr-session configs/yam/yam_sim_eyeball_gello.yaml
+
+version: "1"
+
+session:
+  save_root: recordings
+  record_topic: gello_left/record
+
+nodes:
+  - type: AgentNode
+    name: gello_left
+    agent_class: robots_realtime.agents.teleoperation.gello_leader_agent:GelloLeaderAgent
+    agent_kwargs:
+      port: /dev/ttyACM0
+      arm: left
+    loop_mode: flat_out
+    publish_freq: 200.0
+
+  - type: AgentNode
+    name: gello_right
+    agent_class: robots_realtime.agents.teleoperation.gello_leader_agent:GelloLeaderAgent
+    agent_kwargs:
+      port: /dev/ttyACM1
+      arm: right
+    loop_mode: flat_out
+    publish_freq: 200.0
+
+  - type: XdofSimNode
+    name: yam
+    eyeball_task: tape_handover_random
+    eval_seed: 42
+    physics_dt: 0.0005
+    control_decimation: 17
+    camera_fps: 30.0
+    viser_port: 8765
+    vr_port: 8012
+    cmd_topics:
+      left: gello_left/joint_pos
+      right: gello_right/joint_pos
