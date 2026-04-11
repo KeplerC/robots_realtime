@@ -32,12 +32,20 @@ nodes:
     robot_config: robot_configs/yam/left.yaml
     cmd_topic: gello_left/joint_pos
     poll_freq: 200
+    startup_joint_pos: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    startup_duration_s: 2.0
+    shutdown_joint_pos: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    shutdown_duration_s: 2.0
 
   - type: RobotNode
     name: yam_right
     robot_config: robot_configs/yam/right.yaml
     cmd_topic: gello_right/joint_pos
     poll_freq: 200
+    startup_joint_pos: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    startup_duration_s: 2.0
+    shutdown_joint_pos: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    shutdown_duration_s: 2.0
 
   - type: CameraNode
     name: camera_top

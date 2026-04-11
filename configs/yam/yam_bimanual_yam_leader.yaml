@@ -42,12 +42,20 @@ nodes:
     name: yam_left
     robot_config: robot_configs/yam/left.yaml
     cmd_topic: yam_leader_left/joint_pos
+    startup_joint_pos: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    startup_duration_s: 2.0
+    shutdown_joint_pos: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    shutdown_duration_s: 2.0
 
   # Right YAM Follower Arm
   - type: RobotNode
     name: yam_right
     robot_config: robot_configs/yam/right.yaml
     cmd_topic: yam_leader_right/joint_pos
+    startup_joint_pos: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    startup_duration_s: 2.0
+    shutdown_joint_pos: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    shutdown_duration_s: 2.0
 
   # Optional: Camera nodes (uncomment and configure as needed)
   # - type: CameraNode
