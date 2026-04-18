@@ -1,20 +1,18 @@
 <mujoco model="eyeball_bimanual">
   <!--
-    Eyeball bimanual YAM scene.
-    Two 7-DOF YAM arms + 2-DOF eye gimbal with camera.
+    Bimanual YAM task scene (eye gimbal stripped).
+    Two 7-DOF YAM arms; static exo camera + per-arm wrist cameras.
 
     Coordinate convention (matches URDF / robot_gym):
       Z = up, X = forward (toward workspace), Y = left/right
       Left arm at y=+0.3048, Right arm at y=-0.3048 (12 inches from center)
-      Eye at (0.0217, -0.0151, 0.369) relative to world origin
 
-    Actuator ordering (16 total):
-      [eye_pan, eye_tilt,
-       left_joint1..6, left_gripper,
+    Actuator ordering (14 total):
+      [left_joint1..6, left_gripper,
        right_joint1..6, right_gripper]
   -->
 
-  <compiler angle="radian" meshdir="i2rt_yam/assets"/>
+  <compiler angle="radian" meshdir="../../models/i2rt_yam/assets"/>
 
   <size memory="64M"/>
 
@@ -41,14 +39,14 @@
     <!-- YAM arm defaults (from i2rt_yam/yam.xml) -->
     <default class="yam">
       <position inheritrange="1"/>
-      <joint frictionloss="0.1" axis="0 0 1"/>
+      <joint frictionloss="0.01" damping="0.5" axis="0 0 1"/>
       <default class="dm4340">
         <joint armature="0.032"/>
-        <position kp="40" kv="2.5" forcerange="-28 28"/>
+        <position kp="80" kv="6" forcerange="-28 28"/>
       </default>
       <default class="dm4310">
         <joint armature="0.0018"/>
-        <position kp="10" kv="1" forcerange="-10 10"/>
+        <position kp="30" kv="2" forcerange="-10 10"/>
       </default>
       <default class="visual">
         <geom type="mesh" contype="0" conaffinity="0" density="0" group="2" material="black"/>
@@ -61,14 +59,8 @@
       </default>
       <default class="finger">
         <joint type="slide" armature="0.1" frictionloss="0.1"/>
-        <position ctrlrange="-0.03 0.041" kp="1500" kv="30" inheritrange="0"/>
+        <position ctrlrange="0.0 0.0495" kp="200" kv="14" inheritrange="0"/>
       </default>
-    </default>
-
-    <!-- Eye gimbal defaults (no collision, lightweight) -->
-    <default class="eye">
-      <joint damping="0.5" armature="0.01" frictionloss="0.001"/>
-      <geom contype="0" conaffinity="0" density="0" group="2"/>
     </default>
   </default>
 
@@ -168,10 +160,6 @@
     <geom name="right_wall" type="box" size="1.5 0.005 1.0" pos="0 -1.5 0.24"
           material="room_white" contype="0" conaffinity="0"/>
 
-    <!-- Ceiling -->
-    <geom name="ceiling" type="box" size="1.5 1.5 0.005" pos="0 0 1.24"
-          material="room_white" contype="0" conaffinity="0"/>
-
     <!-- Workspace center marker (useful reference for objects) -->
     <site name="workspace_center" pos="0.43 0 0.05" size="0.005" rgba="1 1 0 0.3" group="4"/>
 
@@ -202,86 +190,18 @@
       <geom name="table_leg_br" type="cylinder" size="0.025 0.355" pos="-0.34 -0.57 -0.385" material="table_mat"/>
     </body>
 
-    <!-- ==================== Eye / Camera Gimbal ==================== -->
-    <!--
-      2-DOF pan/tilt gimbal. No collision bodies.
-      Pan  (yaw):   rotates around Z axis
-      Tilt (pitch): rotates around X axis (after pan)
-      Camera looks along +X in world when both joints = 0.
-    -->
-    <body name="eye_base" pos="0.0217 -0.0151 0.369" childclass="eye">
-      <!-- 6 cube-map pinhole cameras for mono 360° equirectangular rendering.
-           Fixed at the eye position — no gimbal.
-           fovy=100° (>90° gives overlap for smooth blending at seams).
-           Camera looks along -Z_cam; xyaxes define camera X,Y axes in world frame. -->
-      <camera name="cube_px" pos="0 0 0" fovy="100" xyaxes="0 -1 0  0 0 1"/>  <!-- +X (front)  -->
-      <camera name="cube_nx" pos="0 0 0" fovy="100" xyaxes="0 1 0  0 0 1"/>   <!-- -X (back)   -->
-      <camera name="cube_py" pos="0 0 0" fovy="100" xyaxes="1 0 0  0 0 1"/>   <!-- +Y (left)   -->
-      <camera name="cube_ny" pos="0 0 0" fovy="100" xyaxes="-1 0 0  0 0 1"/>  <!-- -Y (right)  -->
-      <camera name="cube_pz" pos="0 0 0" fovy="100" xyaxes="0 -1 0  -1 0 0"/> <!-- +Z (up)     -->
-      <camera name="cube_nz" pos="0 0 0" fovy="100" xyaxes="0 -1 0  1 0 0"/>  <!-- -Z (down)   -->
-
-      <!-- Left eye (Y=+0.03, half of 60mm ELP stereo baseline) -->
-      <camera name="cube_left_px" pos="0 0.03 0" fovy="93" xyaxes="0 -1 0  0 0 1"/>
-      <camera name="cube_left_nx" pos="0 0.03 0" fovy="93" xyaxes="0 1 0  0 0 1"/>
-      <camera name="cube_left_py" pos="0 0.03 0" fovy="93" xyaxes="1 0 0  0 0 1"/>
-      <camera name="cube_left_ny" pos="0 0.03 0" fovy="93" xyaxes="-1 0 0  0 0 1"/>
-      <camera name="cube_left_pz" pos="0 0.03 0" fovy="93" xyaxes="0 -1 0  -1 0 0"/>
-      <camera name="cube_left_nz" pos="0 0.03 0" fovy="93" xyaxes="0 -1 0  1 0 0"/>
-
-      <!-- Right eye (Y=-0.03, half of 60mm ELP stereo baseline) -->
-      <camera name="cube_right_px" pos="0 -0.03 0" fovy="93" xyaxes="0 -1 0  0 0 1"/>
-      <camera name="cube_right_nx" pos="0 -0.03 0" fovy="93" xyaxes="0 1 0  0 0 1"/>
-      <camera name="cube_right_py" pos="0 -0.03 0" fovy="93" xyaxes="1 0 0  0 0 1"/>
-      <camera name="cube_right_ny" pos="0 -0.03 0" fovy="93" xyaxes="-1 0 0  0 0 1"/>
-      <camera name="cube_right_pz" pos="0 -0.03 0" fovy="93" xyaxes="0 -1 0  -1 0 0"/>
-      <camera name="cube_right_nz" pos="0 -0.03 0" fovy="93" xyaxes="0 -1 0  1 0 0"/>
-
-      <!-- Static exo camera: same intrinsics as eye_camera, fixed 45° downward look (no gimbal). -->
-      <camera name="exo_camera" pos="0 0 0" fovy="100"
-              xyaxes="0 -1 0  0.707107 0 0.707107"/>
-
-      <!-- Pan body (yaw around Z) -->
-      <body name="eye_pan" pos="0 0 0">
-        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-5 1e-5 1e-5"/>
-        <joint name="eye_pan" type="hinge" axis="0 0 1" range="-3.14159 3.14159"/>
-
-        <!-- Tilt body (pitch around X) -->
-        <body name="eye_tilt">
-          <inertial pos="0 0 0" mass="0.03" diaginertia="5e-6 5e-6 5e-6"/>
-          <joint name="eye_tilt" type="hinge" axis="0 1 0" range="-1.5708 1.5708"/>
-
-          <!-- Camera sensor: looks along +X in neutral (xyaxes rotates -Z to +X). -->
-          <camera name="eye_camera" pos="0 0 0" fovy="100"
-                  xyaxes="0 -1 0 0 0 1"/>
-
-          <site name="eye_gaze_site" pos="0 0 0" size="0.003" rgba="0 1 0 0.5" group="4"/>
-        </body>
-      </body>
-    </body>
-
-    <!-- ==================== ELP Stereo Camera ==================== -->
-    <!--
-      ELP B0D9793XZN stereo pair, M12 no-distortion (rectilinear) lens.
-      Each eye: 1600x1200 @ 60fps, HFOV ~112°, VFOV ~93°.
-      Calibrated 2026-03-25: baseline 59.01mm, per-eye K + distortion in
-      eye/camera.py get_elp_stereo_calib(). MujocoRenderer(elp_eye=...) renders
-      a wider pinhole and remaps to match the real camera (like fisheye mode).
-      fovy here is the wide pinhole FOV, not the real camera FOV.
-    -->
-    <body name="elp_stereo" pos="0.0217 -0.0151 0.369">
-      <camera name="elp_left" pos="0 0.02951 0" fovy="95"
-              xyaxes="0 -1 0  0.6428 0 0.7660"/>
-      <camera name="elp_right" pos="0 -0.02951 0" fovy="95"
-              xyaxes="0 -1 0  0.6428 0 0.7660"/>
-    </body>
+    <!-- ==================== Exo Camera (static) ==================== -->
+    <!-- Fixed overhead view, 45° downward, same pose/intrinsics as the
+         original eye-mounted exo_camera. No gimbal embodiment. -->
+    <camera name="exo_camera" pos="0.0217 -0.0151 0.369" fovy="100"
+            xyaxes="0 -1 0  0.707107 0 0.707107"/>
 
     <!-- ==================== Left Arm (y=+0.3) ==================== -->
     <!-- Matches URDF world_to_left: xyz="0 0.3048 0" rpy="0 0 0" (12 inches) -->
     <body name="left_arm" pos="0 0.3048 0" childclass="yam">
       <geom class="visual" pos="0 0 -0.0006" quat="1 0 0 1" mesh="model2"/>
       <geom class="collision" size="0.033 0.01" pos="0.0 0.0 0.026" quat="1 0 0 0"/>
-      <body name="left_link_1" pos="0 0 0.0631" quat="1 0 0 1">
+      <body name="left_link_1" pos="0 0 0.0631" quat="1 0 0 1" gravcomp="1">
         <inertial pos="-0.00192861 -0.00795735 0.0208176" quat="0.297851 0.642634 0.360045 0.607185" mass="0.12415"
           diaginertia="0.000180751 0.000145532 5.89179e-05"/>
         <joint name="left_joint1" range="-2.61799 3.05433" class="dm4340"/>
@@ -351,7 +271,7 @@
                   <body name="left_link_left_finger" pos="-0.037 0.0392 0.0605" quat="1 0 1 0" gravcomp="1">
                     <inertial pos="-0.0192995 -0.0365902 0.039774" quat="0.757351 0.568898 -0.3199 0.0" mass="0.118"
                       diaginertia="0.000159084 0.000154909 4.63655e-05"/>
-                    <joint class="finger" name="left_left_finger" range="-0.00205 0.037524"/>
+                    <joint class="finger" name="left_left_finger" range="-0.00205 0.0475"/>
                     <geom class="visual" pos="0.171097 -0.203301 0.037" quat="1 -1 -1 -1" mesh="model2__14"/>
                     <geom class="visual" pos="0.171097 -0.203301 0.037" quat="1 -1 -1 -1" mesh="model2__15"/>
                     <body name="left_lf_rot" quat="1 -1 -1 1" pos="0.0 -0.0392 0.037" gravcomp="1">
@@ -383,7 +303,7 @@
                   <body name="left_link_right_finger" pos="0.037 -0.0392 0.0605" quat="1 0 1 0" gravcomp="1">
                     <inertial pos="-0.0192995 0.0365902 -0.039774" quat="-0.757351 0.568898 -0.3199 0" mass="0.118"
                       diaginertia="0.000159084 0.000154909 4.63655e-05"/>
-                    <joint class="finger" name="left_right_finger" range="-0.037524 0.00205"/>
+                    <joint class="finger" name="left_right_finger" range="-0.0475 0.00205"/>
                     <geom class="visual" pos="0.171097 -0.124901 -0.037" quat="1 -1 -1 -1" mesh="model2__16"/>
                     <geom class="visual" pos="0.171097 -0.124901 -0.037" quat="1 -1 -1 -1" mesh="model2__17"/>
                     <body name="left_rf_rot" quat="1 1 -1 -1" pos="0.0 0.0392 -0.037" gravcomp="1">
@@ -424,7 +344,7 @@
     <body name="right_arm" pos="0 -0.3048 0" childclass="yam">
       <geom class="visual" pos="0 0 -0.0006" quat="1 0 0 1" mesh="model2"/>
       <geom class="collision" size="0.033 0.01" pos="0.0 0.0 0.026" quat="1 0 0 0"/>
-      <body name="right_link_1" pos="0 0 0.0631" quat="1 0 0 1">
+      <body name="right_link_1" pos="0 0 0.0631" quat="1 0 0 1" gravcomp="1">
         <inertial pos="-0.00192861 -0.00795735 0.0208176" quat="0.297851 0.642634 0.360045 0.607185" mass="0.12415"
           diaginertia="0.000180751 0.000145532 5.89179e-05"/>
         <joint name="right_joint1" range="-2.61799 3.05433" class="dm4340"/>
@@ -494,7 +414,7 @@
                   <body name="right_link_left_finger" pos="-0.037 0.0392 0.0605" quat="1 0 1 0" gravcomp="1">
                     <inertial pos="-0.0192995 -0.0365902 0.039774" quat="0.757351 0.568898 -0.3199 0.0" mass="0.118"
                       diaginertia="0.000159084 0.000154909 4.63655e-05"/>
-                    <joint class="finger" name="right_left_finger" range="-0.00205 0.037524"/>
+                    <joint class="finger" name="right_left_finger" range="-0.00205 0.0475"/>
                     <geom class="visual" pos="0.171097 -0.203301 0.037" quat="1 -1 -1 -1" mesh="model2__14"/>
                     <geom class="visual" pos="0.171097 -0.203301 0.037" quat="1 -1 -1 -1" mesh="model2__15"/>
                     <body name="right_lf_rot" quat="1 -1 -1 1" pos="0.0 -0.0392 0.037" gravcomp="1">
@@ -526,7 +446,7 @@
                   <body name="right_link_right_finger" pos="0.037 -0.0392 0.0605" quat="1 0 1 0" gravcomp="1">
                     <inertial pos="-0.0192995 0.0365902 -0.039774" quat="-0.757351 0.568898 -0.3199 0" mass="0.118"
                       diaginertia="0.000159084 0.000154909 4.63655e-05"/>
-                    <joint class="finger" name="right_right_finger" range="-0.037524 0.00205"/>
+                    <joint class="finger" name="right_right_finger" range="-0.0475 0.00205"/>
                     <geom class="visual" pos="0.171097 -0.124901 -0.037" quat="1 -1 -1 -1" mesh="model2__16"/>
                     <geom class="visual" pos="0.171097 -0.124901 -0.037" quat="1 -1 -1 -1" mesh="model2__17"/>
                     <body name="right_rf_rot" quat="1 1 -1 -1" pos="0.0 0.0392 -0.037" gravcomp="1">
@@ -577,56 +497,45 @@
 
   <!-- ==================== Actuators ==================== -->
   <!--
-    16 actuators total:
-      [0-1]   Eye:   eye_pan, eye_tilt
-      [2-8]   Left:  joint1-6, gripper
-      [9-15]  Right: joint1-6, gripper
+    14 actuators total:
+      [0-6]  Left:  joint1-6, gripper
+      [7-13] Right: joint1-6, gripper
   -->
   <actuator>
-    <!-- Eye (position-controlled, tuned for snappy + stable tracking) -->
-    <position name="eye_pan" joint="eye_pan" kp="20" kv="2" forcerange="-10 10" inheritrange="1"/>
-    <position name="eye_tilt" joint="eye_tilt" kp="20" kv="2" forcerange="-10 10" inheritrange="1"/>
-
     <!-- Left arm -->
-    <!-- Old gains: j1-3 dm4340 kp=40 kv=2.5, j4 kp=20 kv=0.5, j5-6 dm4310 kp=10 kv=1 -->
-    <position name="left_joint1" joint="left_joint1" class="dm4340" kp="49" kv="1.5"/>
-    <position name="left_joint2" joint="left_joint2" class="dm4340" kp="49" kv="2.3"/>
-    <position name="left_joint3" joint="left_joint3" class="dm4340" kp="75" kv="5.1"/>
-    <position name="left_joint4" joint="left_joint4" class="dm4310" kp="16" kv="0.5"/>
-    <position name="left_joint5" joint="left_joint5" class="dm4310" kp="9.5" kv="0.3"/>
-    <position name="left_joint6" joint="left_joint6" class="dm4310" kp="10" kv="0.5"/>
+    <position name="left_joint1" joint="left_joint1" class="dm4340"/>
+    <position name="left_joint2" joint="left_joint2" class="dm4340"/>
+    <position name="left_joint3" joint="left_joint3" class="dm4340"/>
+    <position name="left_joint4" joint="left_joint4" class="dm4310"/>
+    <position name="left_joint5" joint="left_joint5" class="dm4310"/>
+    <position name="left_joint6" joint="left_joint6" class="dm4310"/>
     <position class="finger" name="left_gripper" joint="left_left_finger"/>
 
     <!-- Right arm -->
-    <!-- Old gains: j1-3 dm4340 kp=40 kv=2.5, j4 kp=20 kv=0.5, j5-6 dm4310 kp=10 kv=1 -->
-    <position name="right_joint1" joint="right_joint1" class="dm4340" kp="49" kv="1.5"/>
-    <position name="right_joint2" joint="right_joint2" class="dm4340" kp="49" kv="2.3"/>
-    <position name="right_joint3" joint="right_joint3" class="dm4340" kp="75" kv="5.1"/>
-    <position name="right_joint4" joint="right_joint4" class="dm4310" kp="16" kv="0.5"/>
-    <position name="right_joint5" joint="right_joint5" class="dm4310" kp="9.5" kv="0.3"/>
-    <position name="right_joint6" joint="right_joint6" class="dm4310" kp="10" kv="0.5"/>
+    <position name="right_joint1" joint="right_joint1" class="dm4340"/>
+    <position name="right_joint2" joint="right_joint2" class="dm4340"/>
+    <position name="right_joint3" joint="right_joint3" class="dm4340"/>
+    <position name="right_joint4" joint="right_joint4" class="dm4310"/>
+    <position name="right_joint5" joint="right_joint5" class="dm4310"/>
+    <position name="right_joint6" joint="right_joint6" class="dm4310"/>
     <position class="finger" name="right_gripper" joint="right_left_finger"/>
   </actuator>
 
   <!-- ==================== Keyframes ==================== -->
   <!--
-    qpos order (18 DOF, robot only — task objects added via MjSpec):
-      eye_pan, eye_tilt,
+    qpos order (16 DOF, robot only — task objects added via MjSpec):
       left_joint1..6, left_left_finger, left_right_finger,
       right_joint1..6, right_left_finger, right_right_finger
 
-    ctrl order (16 actuators):
-      eye_pan, eye_tilt,
+    ctrl order (14 actuators):
       left_joint1..6, left_gripper,
       right_joint1..6, right_gripper
   -->
   <keyframe>
     <key name="home"
-      qpos="0 0
-            0 0 0 0 0 0 0 0
+      qpos="0 0 0 0 0 0 0 0
             0 0 0 0 0 0 0 0"
-      ctrl="0 0
-            0 0 0 0 0 0 0
+      ctrl="0 0 0 0 0 0 0
             0 0 0 0 0 0 0"/>
   </keyframe>
 </mujoco>

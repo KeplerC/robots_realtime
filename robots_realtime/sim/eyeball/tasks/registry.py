@@ -10,7 +10,7 @@ from .plate import PlacePlateInRackTask
 from .medical_tray import MedicalTrayTask
 from .pegboard import HangToolOnPegboardTask
 from .spoon_hanging import HangSpoonOnHookTask
-from .wrapper import TablePoseOOD, CameraOOD, VisualOOD, LightingOOD, ObjectOOD, DistractorOOD
+from .wrapper import TablePoseOOD, ObjectOOD, DistractorOOD
 
 TASK_REGISTRY: dict[str, type[Task] | partial[Task]] = {
     "tape_handover_random": partial(TapeHandoverTask, placement_mode="poisson"),
@@ -26,16 +26,11 @@ TASK_REGISTRY: dict[str, type[Task] | partial[Task]] = {
     "hang_tool_on_pegboard": HangToolOnPegboardTask,
     "medical_tray": MedicalTrayTask,
     "hang_spoon_on_hook": HangSpoonOnHookTask,
-    # OOD wrappers
+    # OOD wrappers (camera/visual/lighting variants need eye_camera — omitted)
     "tape_handover_table_high":  lambda: TablePoseOOD(TapeHandoverTask(placement_mode="poisson"), dz=(0.0, 0.15)),
     "tape_handover_table_shift": lambda: TablePoseOOD(TapeHandoverTask(placement_mode="poisson"), dx=(-0.05, 0.05), dy=(-0.03, 0.03)),
-    "tape_handover_camera_ood":  lambda: CameraOOD(TapeHandoverTask(placement_mode="poisson"), translate_max=0.05, rotate_max=0.1),
-    "tape_handover_visual_ood":  lambda: VisualOOD(TapeHandoverTask(placement_mode="poisson")),
     "tape_handover_distractor":  lambda: DistractorOOD(TapeHandoverTask(placement_mode="poisson")),
-    "tape_handover_lighting_ood": lambda: LightingOOD(TapeHandoverTask(placement_mode="poisson")),
     "tape_handover_object_ood":  lambda: ObjectOOD(TapeHandoverTask(placement_mode="poisson")),
     "tiger_table_high":          lambda: TablePoseOOD(PickUpTigerTask(), dz=(0.0, 0.15)),
-    "tiger_camera_ood":          lambda: CameraOOD(PickUpTigerTask(), translate_max=0.05, rotate_max=0.1),
-    "tiger_lighting_ood":        lambda: LightingOOD(PickUpTigerTask()),
     "tiger_object_ood":          lambda: ObjectOOD(PickUpTigerTask()),
 }
