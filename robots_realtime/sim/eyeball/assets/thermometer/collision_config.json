@@ -1,0 +1,37 @@
+{
+  "visual_mesh": "thermometer.obj",
+  "collision_meshes": [
+    "thermometer_collision_0.obj",
+    "thermometer_collision_1.obj",
+    "thermometer_collision_2.obj",
+    "thermometer_collision_3.obj",
+    "thermometer_collision_4.obj",
+    "thermometer_collision_5.obj",
+    "thermometer_collision_6.obj",
+    "thermometer_collision_7.obj",
+    "thermometer_collision_8.obj",
+    "thermometer_collision_9.obj",
+    "thermometer_collision_10.obj",
+    "thermometer_collision_11.obj",
+    "thermometer_collision_12.obj",
+    "thermometer_collision_13.obj",
+    "thermometer_collision_14.obj",
+    "thermometer_collision_15.obj",
+    "thermometer_collision_16.obj",
+    "thermometer_collision_17.obj",
+    "thermometer_collision_18.obj",
+    "thermometer_collision_19.obj",
+    "thermometer_collision_20.obj",
+    "thermometer_collision_21.obj",
+    "thermometer_collision_22.obj",
+    "thermometer_collision_23.obj"
+  ],
+  "visual_submeshes": [
+    {
+      "mesh_file": "thermometer_visual_0.obj",
+      "texture_file": "thermometer_visual_0.png",
+      "material_name": "thermometer_mat_0"
+    }
+  ],
+  "mesh_scale": 0.102
+}

@@ -1,0 +1,23 @@
+{
+  "visual_mesh": "wrench.obj",
+  "collision_meshes": [
+    "wrench_collision_0.obj",
+    "wrench_collision_1.obj",
+    "wrench_collision_2.obj",
+    "wrench_collision_3.obj",
+    "wrench_collision_4.obj",
+    "wrench_collision_5.obj",
+    "wrench_collision_6.obj",
+    "wrench_collision_7.obj",
+    "wrench_collision_8.obj",
+    "wrench_collision_9.obj"
+  ],
+  "visual_submeshes": [
+    {
+      "mesh_file": "wrench_visual_0.obj",
+      "texture_file": "wrench_visual_0.png",
+      "material_name": "wrench_mat_0"
+    }
+  ],
+  "mesh_scale": 0.15
+}

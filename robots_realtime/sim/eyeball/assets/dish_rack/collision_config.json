@@ -1,0 +1,34 @@
+{
+  "visual_mesh": "dish_rack.obj",
+  "collision_meshes": [
+    "dish_rack_collision_0.obj",
+    "dish_rack_collision_1.obj",
+    "dish_rack_collision_2.obj",
+    "dish_rack_collision_3.obj",
+    "dish_rack_collision_4.obj",
+    "dish_rack_collision_5.obj",
+    "dish_rack_collision_6.obj",
+    "dish_rack_collision_7.obj",
+    "dish_rack_collision_8.obj",
+    "dish_rack_collision_9.obj",
+    "dish_rack_collision_10.obj",
+    "dish_rack_collision_11.obj",
+    "dish_rack_collision_12.obj",
+    "dish_rack_collision_13.obj",
+    "dish_rack_collision_14.obj",
+    "dish_rack_collision_15.obj",
+    "dish_rack_collision_16.obj",
+    "dish_rack_collision_17.obj",
+    "dish_rack_collision_18.obj",
+    "dish_rack_collision_19.obj",
+    "dish_rack_collision_20.obj"
+  ],
+  "visual_submeshes": [
+    {
+      "mesh_file": "dish_rack_visual_0.obj",
+      "texture_file": "dish_rack_visual_0.png",
+      "material_name": "dish_rack_mat_0"
+    }
+  ],
+  "mesh_scale": 0.22
+}
