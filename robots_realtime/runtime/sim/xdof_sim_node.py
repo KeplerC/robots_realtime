@@ -546,6 +546,7 @@ class XdofSimNode(Node):
 
         with self._cmd_lock:
             self._cmd = np.array(self._env.get_init_q(), dtype=np.float64)
+        self._prev_cmd: np.ndarray | None = None
         self._env.reset()
 
         cam_names = getattr(self._env, "camera_names", [])
@@ -645,10 +646,12 @@ class XdofSimNode(Node):
             with self._cmd_lock:
                 self._cmd[:] = self._env.get_init_q()
 
-        # 3. Step physics
+        # 3. Step physics with interpolation from previous command
         with self._cmd_lock:
             cmd_snapshot = self._cmd.copy()
-        self._env._step_single(cmd_snapshot)
+        prev = self._prev_cmd if self._prev_cmd is not None else cmd_snapshot
+        self._env._step_single_interp(prev, cmd_snapshot)
+        self._prev_cmd = cmd_snapshot
 
         # 4. Record sim state at every physics step
         now = time.time()

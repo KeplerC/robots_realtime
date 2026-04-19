@@ -204,6 +204,23 @@ class MuJoCoYAMEnv(gym.Env):
         for _ in range(self._control_decimation):
             mujoco.mj_step(self.model, self.data)
 
+    def _step_single_interp(
+        self, prev_action: np.ndarray, next_action: np.ndarray
+    ) -> None:
+        """Advance physics by control_decimation steps, linearly interpolating ctrl."""
+        n = self._control_decimation
+        for k in range(n):
+            alpha = (k + 1) / n
+            action = prev_action + alpha * (next_action - prev_action)
+            ctrl = np.zeros(self.model.nu)
+            for i in range(self.single_timestep_action_dim):
+                val = float(action[i])
+                if i in self._gripper_set:
+                    val = val * _GRIPPER_CTRL_MAX
+                ctrl[self._ctrl_indices[i]] = val
+            self.data.ctrl[:] = ctrl
+            mujoco.mj_step(self.model, self.data)
+
     def step_single(self, action_14d: np.ndarray) -> None:
         """Alias for _step_single (backwards compatibility)."""
         self._step_single(action_14d)
