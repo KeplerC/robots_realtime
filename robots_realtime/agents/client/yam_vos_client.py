@@ -24,6 +24,11 @@ from robots_realtime.robots.inverse_kinematics.yam_pyroki import YamPyroki
 from robots_realtime.utils.server_client_utils import SyncMsgpackNumpyClient
 
 
+def _g(d: Dict[Any, Any], key: str) -> Any:
+    """Get from dict trying both string and byte-string keys."""
+    return d.get(key) if key in d else d.get(key.encode())
+
+
 def _load_yam_urdf() -> yourdfpy.URDF:
     """Load a fresh YAM URDF instance (avoids deepcopy issues with dict_keys)."""
     current_path = os.path.dirname(os.path.abspath(__file__))
@@ -81,6 +86,8 @@ class YamVosClientAgent(Agent):
 
         self.obs: Optional[Dict[str, Any]] = None
         self._update_period = 0.05
+        self._last_reset_request_seq_seen = 0
+        self._last_reset_ack_seq_seen = 0
 
         self._setup_visualization()
 
@@ -144,11 +151,35 @@ class YamVosClientAgent(Agent):
 
             time.sleep(self._update_period)
 
+    def _sync_fallback_state_from_obs(self) -> None:
+        """Reset local fallback / visualization state to the latest observed robot config."""
+        if self.obs is None:
+            return
+        for arm_key in ("left", "right"):
+            arm_obs = self.obs.get(arm_key)
+            if not isinstance(arm_obs, dict):
+                continue
+            joint_pos = arm_obs.get("joint_pos")
+            if joint_pos is None:
+                continue
+            joint_pos = np.asarray(joint_pos, dtype=np.float32)
+            if arm_key in self.ik.joints and joint_pos.shape[0] >= 6:
+                self.ik.joints[arm_key] = joint_pos[:6].copy()
+            if arm_key == "left" and joint_pos.shape[0] >= 7:
+                # Best-effort resync of the teleop gripper UI to the reset state.
+                self.left_gripper_slider.value = float(np.clip(joint_pos[6] / 0.0475, 0.0, 1.0))
+        self.vos_joint_pos = None
+        self.vos_gripper_pos = None
+
     # ------------------------------------------------------------------
     # Agent interface
     # ------------------------------------------------------------------
 
-    def act(self, obs: Dict[str, Any]) -> Dict[str, Dict[str, np.ndarray]]:
+    def reset(self) -> None:
+        self._last_reset_request_seq_seen = 0
+        self._last_reset_ack_seq_seen = 0
+
+    def act(self, obs: Dict[str, Any]) -> Dict[str, Any]:
         self.obs = dict(obs)
 
         # Enrich camera observations with pose/pose_mat if available
@@ -158,6 +189,29 @@ class YamVosClientAgent(Agent):
                 if extrinsics is not None:
                     cam_obs["pose"] = np.concatenate([extrinsics["position"], extrinsics["wxyz"]])
                     cam_obs["pose_mat"] = extrinsics["pose_mat"]
+
+        # Ack resets only after the sim node has applied them and published fresh state.
+        observed_reset_ack = None
+        for arm_key in ("left", "right"):
+            arm_obs = self.obs.get(arm_key)
+            if isinstance(arm_obs, dict):
+                ack_seq = arm_obs.get("reset_ack_seq")
+                if ack_seq is not None:
+                    try:
+                        ack_seq = int(ack_seq)
+                    except (TypeError, ValueError):
+                        ack_seq = None
+                if ack_seq is not None:
+                    observed_reset_ack = max(observed_reset_ack or ack_seq, ack_seq)
+        if (
+            observed_reset_ack is not None
+            and observed_reset_ack > self._last_reset_ack_seq_seen
+        ):
+            self._last_reset_ack_seq_seen = observed_reset_ack
+            self._sync_fallback_state_from_obs()
+            print(f"[YamVosClient] observed reset applied seq={observed_reset_ack}")
+        if self._last_reset_ack_seq_seen > 0:
+            self.obs["vos_control"] = {"reset_ack_seq": self._last_reset_ack_seq_seen}
 
         # Send observation to vOS, receive action
         # DEBUG: print obs structure on first call
@@ -178,12 +232,12 @@ class YamVosClientAgent(Agent):
             response = {}
 
         # Process per-arm responses
-        action: Dict[str, Dict[str, np.ndarray]] = {}
+        action: Dict[str, Any] = {}
         for arm_key in ["left", "right"]:
-            arm_resp = response.get(arm_key.encode()) if response else None
+            arm_resp = _g(response, arm_key) if response else None
             if arm_resp is not None:
-                vos_jp = np.asarray(arm_resp.get(b"joint_pos"), dtype=np.float32)
-                vos_grip = float(np.asarray(arm_resp.get(b"gripper"), dtype=np.float32))
+                vos_jp = np.asarray(_g(arm_resp, "joint_pos"), dtype=np.float32)
+                vos_grip = float(np.asarray(_g(arm_resp, "gripper"), dtype=np.float32))
                 # vos_grip is a 0-1 fraction; the sim env multiplies by
                 # _GRIPPER_CTRL_MAX internally, so pass the fraction directly.
                 action[arm_key] = {"pos": np.concatenate([vos_jp, [vos_grip]])}
@@ -192,6 +246,19 @@ class YamVosClientAgent(Agent):
                 if arm_key == "left":
                     self.vos_joint_pos = vos_jp
                     self.vos_gripper_pos = np.float32(vos_grip)
+
+        control = _g(response, "vos_control") if response else None
+        reset_seq = _g(control, "reset_seq") if isinstance(control, dict) else None
+        if reset_seq is not None:
+            try:
+                reset_seq = int(reset_seq)
+            except (TypeError, ValueError):
+                reset_seq = None
+        if reset_seq is not None and reset_seq > self._last_reset_request_seq_seen:
+            self._last_reset_request_seq_seen = reset_seq
+            print(f"[YamVosClient] received remote reset request seq={reset_seq}")
+            action["reset_env"] = True
+            action["reset_env_seq"] = reset_seq
 
         # Fallback: if no vOS response for an arm, use IK gizmo (left only)
         if "left" not in action:

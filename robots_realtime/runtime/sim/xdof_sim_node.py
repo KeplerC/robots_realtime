@@ -501,6 +501,8 @@ class XdofSimNode(Node):
 
         # Stale-message skip: track last-seen timestamp per subscribed topic
         self._last_cmd_ts: dict[str, float] = {}
+        self._pending_reset_ack_seq: int | None = None
+        self._reset_ack_remaining: int = 0
         # Throttle viser pose + state publish to ~30 Hz
         self._last_obs_ts: float = 0.0
         self._obs_interval: float = 1.0 / 30.0
@@ -600,6 +602,8 @@ class XdofSimNode(Node):
 
     def step(self) -> None:
         # 1. Absorb latest commands — skip stale messages
+        reset_requested = False
+        reset_seq = None
         for arm_key, topic in self._cmd_topics.items():
             ts = self.get_timestamp(topic)
             if ts is None:
@@ -611,6 +615,10 @@ class XdofSimNode(Node):
             latest = self.get_latest(topic)
             if latest is None:
                 continue
+            if bool(latest.get("reset_env")):
+                reset_requested = True
+                if latest.get("reset_seq") is not None:
+                    reset_seq = latest.get("reset_seq")
             jp = latest.get("joint_pos")
             if jp is None:
                 continue
@@ -621,6 +629,15 @@ class XdofSimNode(Node):
                     self._cmd[:_DOFS_PER_ARM] = arr[:_DOFS_PER_ARM]
                 elif arm_key == "right":
                     self._cmd[_DOFS_PER_ARM: _DOFS_PER_ARM * 2] = arr[:_DOFS_PER_ARM]
+
+        if reset_requested:
+            self._env.reset()
+            with self._cmd_lock:
+                self._cmd[:] = self._env.get_init_q()
+            if reset_seq is not None:
+                self._pending_reset_ack_seq = int(reset_seq)
+                self._reset_ack_remaining = 10
+            logger.info("[%s] applied remote reset%s", self.name, f" seq={reset_seq}" if reset_seq is not None else "")
 
         # 2. GUI reset from viser
         if self._viser is not None and self._viser.pop_reset_requested():
@@ -654,8 +671,17 @@ class XdofSimNode(Node):
                 left_state = state[:_DOFS_PER_ARM].tolist()
                 right_state = state[_DOFS_PER_ARM:].tolist()
 
-            self.publish("left_state", {"joint_pos": left_state}, ts=now)
-            self.publish("right_state", {"joint_pos": right_state}, ts=now)
+            left_msg = {"joint_pos": left_state}
+            right_msg = {"joint_pos": right_state}
+            if self._pending_reset_ack_seq is not None:
+                left_msg["reset_ack_seq"] = int(self._pending_reset_ack_seq)
+                right_msg["reset_ack_seq"] = int(self._pending_reset_ack_seq)
+            self.publish("left_state", left_msg, ts=now)
+            self.publish("right_state", right_msg, ts=now)
+            if self._pending_reset_ack_seq is not None:
+                self._reset_ack_remaining -= 1
+                if self._reset_ack_remaining <= 0:
+                    self._pending_reset_ack_seq = None
 
             if self._viser is not None:
                 self._viser.update_poses_only()

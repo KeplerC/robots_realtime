@@ -9,7 +9,7 @@ nodes:
     agent_class: robots_realtime.agents.client.yam_vos_client:YamVosClientAgent
     agent_kwargs:
       viser_port: 8765
-      client_host: "0.0.0.0"
+      client_host: "127.0.0.1"
       client_port: 9100
       bimanual: true
     ik_freq: 30.0

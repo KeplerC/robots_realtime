@@ -58,7 +58,7 @@ class ViserTeleopNode(Node):
     """
 
     role = NodeRole.CONTROLLER
-    published_topics: list[str] = ["joint_pos", "left_joint_pos", "right_joint_pos"]
+    published_topics: list[str] = ["joint_pos", "left_joint_pos", "right_joint_pos", "reset_env"]
     subscriber_driven: bool = False
 
     def __init__(
@@ -127,6 +127,8 @@ class ViserTeleopNode(Node):
 
         # agent.act() sets agent.obs (drives visualization) and returns IK targets.
         action = self._agent.act(state_obs)
+        reset_requested = bool(action.get("reset_env")) if isinstance(action, dict) else False
+        reset_seq = action.get("reset_env_seq") if isinstance(action, dict) else None
 
         # Publish joint commands — per-arm if bimanual, single if not.
         if isinstance(action, dict) and any(k in action for k in ("left", "right")):
@@ -134,11 +136,26 @@ class ViserTeleopNode(Node):
                 arm = action.get(arm_key)
                 if arm is not None:
                     pos = np.asarray(arm["pos"] if isinstance(arm, dict) else arm, dtype=np.float32)
-                    self.publish(f"{arm_key}_joint_pos", {"joint_pos": pos}, ts=ts)
+                    msg = {"joint_pos": pos}
+                    if reset_requested:
+                        msg["reset_env"] = True
+                        if reset_seq is not None:
+                            msg["reset_seq"] = int(reset_seq)
+                    self.publish(f"{arm_key}_joint_pos", msg, ts=ts)
         else:
             pos = self._extract_pos(action)
             if pos is not None:
-                self.publish("joint_pos", {"joint_pos": pos}, ts=ts)
+                msg = {"joint_pos": pos}
+                if reset_requested:
+                    msg["reset_env"] = True
+                    if reset_seq is not None:
+                        msg["reset_seq"] = int(reset_seq)
+                self.publish("joint_pos", msg, ts=ts)
+        if reset_requested:
+            msg = {"reset": True}
+            if reset_seq is not None:
+                msg["reset_seq"] = int(reset_seq)
+            self.publish("reset_env", msg, ts=ts)
 
     def cleanup(self) -> None:
         if self._agent is not None and hasattr(self._agent, "close"):
