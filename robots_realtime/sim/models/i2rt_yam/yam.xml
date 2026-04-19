@@ -9,11 +9,11 @@
       <joint frictionloss="0.01" damping="0.5" axis="0 0 1"/>
       <default class="dm4340">
         <joint armature="0.032"/>
-        <position kp="80" kv="6" forcerange="-28 28"/>
+        <position kp="40" kv="8" forcerange="-28 28"/>
       </default>
       <default class="dm4310">
         <joint armature="0.0018"/>
-        <position kp="30" kv="2" forcerange="-10 10"/>
+        <position kp="15" kv="3" forcerange="-10 10"/>
       </default>
       <default class="visual">
         <geom type="mesh" contype="0" conaffinity="0" density="0" group="2" material="black"/>

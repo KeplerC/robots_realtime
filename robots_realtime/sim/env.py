@@ -45,7 +45,7 @@ class MuJoCoYAMEnv(gym.Env):
         camera_height: int = 480,
         camera_width: int = 640,
         physics_dt: float = 0.002,
-        control_decimation: int = 17,  # 0.002 * 17 ≈ 34 ms per control step ≈ 30 Hz
+        control_decimation: int = 5,  # 0.002 * 5 = 10 ms per control step ≈ 100 Hz
     ):
         super().__init__()
         self.config = config or default_sim_config()
