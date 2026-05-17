@@ -9,13 +9,15 @@ nodes:
     agent_class: robots_realtime.agents.client.franka_osc_client_cartesian:FrankaOscClientCartesianAgent
     agent_kwargs:
       viser_port: 8765
-      ik_rate: 100.0
+      ik_rate: 30.0
       robotiq_gripper: true
       visualize_rgbd: false
-      client_host: "0.0.0.0"
+      client_host: "127.0.0.1"
       client_port: 9000
+      debug_msgpack: false
+      hold_on_empty_response: true
     arm_key: left
-    ik_freq: 100.0
+    ik_freq: 30.0
     viz_freq: 20.0
     state_topics:
       left: franka/joint_state
@@ -24,14 +26,14 @@ nodes:
 
   - type: RobotNode
     name: franka
-    robot_config: robot_configs/franka/franka_robotiq_gripper.yaml
+    robot_config: robot_configs/franka/franka_fake_gripper.yaml
     cmd_topic: franka_viser/joint_pos
+    poll_freq: 100.0
 
   - type: CameraNode
     name: camera_top
-    driver: ZedCamera
-    device_id: "35062621"
-    resolution: HD720
+    driver: robots_realtime.sensors.cameras.opencv_camera:OpencvCamera
+    device_path: /dev/video4
+    resolution: [1344, 376]
     fps: 30
-    enable_depth: true
-    extrinsics_file: configs/camera_extrinsics/autolab_franka_zed_top.yaml
+    poll_freq: 30.0

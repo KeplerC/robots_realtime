@@ -1,0 +1,32 @@
+version: "1"
+
+session:
+  save_root: recordings
+
+nodes:
+  - type: ViserTeleopNode
+    name: franka_viser
+    agent_class: robots_realtime.agents.client.franka_osc_client_cartesian_confirm:FrankaOscClientCartesianConfirmAgent
+    agent_kwargs:
+      viser_port: 8765
+      ik_rate: 100.0
+      robotiq_gripper: true  # Match gripper-enabled robot config (8 DOF)
+      visualize_rgbd: false
+      client_host: "127.0.0.1"
+      client_port: 9000
+      debug_msgpack: true
+      hold_on_empty_response: true  # Hold current position until VOS sends a command
+    arm_key: left
+    ik_freq: 100.0
+    viz_freq: 20.0
+    state_topics:
+      left: franka/joint_state
+    # No image_topics - camera not needed for motion-only workflow
+
+  - type: RobotNode
+    name: franka
+    robot_config: robot_configs/franka/franka_arm_only.yaml
+    cmd_topic: franka_viser/joint_pos
+    poll_freq: 100
+
+  # CameraNode removed - not needed for forward/backward motion test

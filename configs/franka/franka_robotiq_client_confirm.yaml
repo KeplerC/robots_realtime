@@ -6,7 +6,7 @@ session:
 nodes:
   - type: ViserTeleopNode
     name: franka_viser
-    agent_class: robots_realtime.agents.client.franka_osc_client_cartesian:FrankaOscClientCartesianAgent
+    agent_class: robots_realtime.agents.client.franka_osc_client_cartesian_confirm:FrankaOscClientCartesianConfirmAgent
     agent_kwargs:
       viser_port: 8765
       ik_rate: 100.0

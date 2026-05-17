@@ -126,7 +126,12 @@ class ViserAbstractBase(ABC):
                 tcp_offset_frame=self.viser_server.scene.add_frame(
                     "target_left/tcp_offset", show_axes=False, position=(0.0, 0.0, 0.0), wxyz=(1, 0, 0, 0)
                 ),
-                control=self.viser_server.scene.add_transform_controls("target_left", scale=self.tf_size_handle.value),
+                control=self.viser_server.scene.add_transform_controls(
+                    "target_left",
+                    scale=self.tf_size_handle.value,
+                    line_width=6.0,
+                    depth_test=False,
+                ),
             ),
         }
         if self.bimanual:
@@ -135,7 +140,10 @@ class ViserAbstractBase(ABC):
                     "target_right/tcp_offset", show_axes=False, position=(0.0, 0.0, 0.0), wxyz=(1, 0, 0, 0)
                 ),
                 control=self.viser_server.scene.add_transform_controls(
-                    "target_right", scale=self.tf_size_handle.value
+                    "target_right",
+                    scale=self.tf_size_handle.value,
+                    line_width=6.0,
+                    depth_test=False,
                 ),
             )
 

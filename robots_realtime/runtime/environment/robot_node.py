@@ -88,6 +88,7 @@ class RobotNode(Node):
         self._robot = robot
         self._cmd_topic = cmd_topic
         self._robot_config = robot_config  # stored for reference; instantiation is caller's job
+        self._no_cmd_hold_pos = None
 
     def setup(self) -> None:
         if self._robot is None:
@@ -99,12 +100,28 @@ class RobotNode(Node):
             self._robot = _instantiate_from_target_yaml(self._robot_config)
 
     def step(self) -> None:
+        import sys
         ts = time.time()
+
+        # Track step calls
+        if not hasattr(self, '_step_call_count'):
+            self._step_call_count = 0
+        self._step_call_count += 1
+
+        if self._step_call_count == 1:
+            print(f"[{self.name}] RobotNode.step() FIRST CALL!", file=sys.stderr, flush=True)
+        elif self._step_call_count % 100 == 0:
+            print(f"[{self.name}] RobotNode.step() call #{self._step_call_count}", file=sys.stderr, flush=True)
+
+        # Get observations first (needed for both commanding and publishing)
+        obs = self._robot.get_observations()
+
         if self._cmd_topic:
             cmd = self.get_latest(self._cmd_topic)
             if cmd is not None:
                 # Use np.array() to ensure a writable copy (np.asarray may return read-only view)
                 joint_pos = np.array(cmd["joint_pos"], dtype=np.float64)
+                self._no_cmd_hold_pos = None
                 # Debug: log commands every 100 steps
                 if not hasattr(self, '_step_count'):
                     self._step_count = 0
@@ -113,13 +130,36 @@ class RobotNode(Node):
                     print(f"[{self.name}] RobotNode step {self._step_count}: received cmd, calling command_joint_pos with {joint_pos}")
                 self._robot.command_joint_pos(joint_pos)
             else:
+                # SAFETY: No command from agent yet - hold current position to prevent drooping
                 if not hasattr(self, '_no_cmd_count'):
                     self._no_cmd_count = 0
                 self._no_cmd_count += 1
-                if self._no_cmd_count % 100 == 0:
-                    print(f"[{self.name}] RobotNode: NO COMMAND received from {self._cmd_topic} (count: {self._no_cmd_count})")
 
-        self.publish("joint_state", self._robot.get_observations(), ts=ts)
+                # Command robot to hold current position
+                if 'joint_pos' in obs:
+                    if self._no_cmd_hold_pos is None:
+                        self._no_cmd_hold_pos = np.array(obs['joint_pos'], dtype=np.float64)
+                    self._robot.command_joint_pos(self._no_cmd_hold_pos.copy())
+                    if self._no_cmd_count <= 5 or self._no_cmd_count % 100 == 0:
+                        print(
+                            f"[{self.name}] RobotNode: NO COMMAND yet - holding "
+                            f"latched position (count: {self._no_cmd_count})"
+                        )
+                else:
+                    if self._no_cmd_count % 100 == 0:
+                        print(f"[{self.name}] RobotNode: NO COMMAND and no observations yet (count: {self._no_cmd_count})")
+
+        # Publish observations to message bus
+
+        if self._step_call_count == 1:
+            print(f"[{self.name}] First get_observations() returned: {list(obs.keys()) if isinstance(obs, dict) else type(obs)}", file=sys.stderr, flush=True)
+            if isinstance(obs, dict) and 'joint_pos' in obs:
+                print(f"[{self.name}]   joint_pos shape: {obs['joint_pos'].shape if hasattr(obs['joint_pos'], 'shape') else type(obs['joint_pos'])}", file=sys.stderr, flush=True)
+
+        self.publish("joint_state", obs, ts=ts)
+
+        if self._step_call_count == 1:
+            print(f"[{self.name}] Published to 'joint_state' topic", file=sys.stderr, flush=True)
 
     def cleanup(self) -> None:
         if hasattr(self._robot, "stop"):

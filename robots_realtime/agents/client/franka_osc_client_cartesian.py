@@ -42,11 +42,15 @@ class FrankaOscClientCartesianAgent(Agent):
         viser_port: int = 8080,
         client_host: str = "0.0.0.0",
         client_port: int = 9000,
+        debug_msgpack: bool = False,
+        hold_on_empty_response: bool = False,
     ) -> None:
         self.bimanual = bimanual
         self.robotiq_gripper = robotiq_gripper
         self.right_arm_extrinsic = right_arm_extrinsic
         self.visualize_rgbd = visualize_rgbd
+        self.debug_msgpack = debug_msgpack
+        self.hold_on_empty_response = hold_on_empty_response
         if self.bimanual:
             assert right_arm_extrinsic is not None, (
                 "right_arm_extrinsic must be provided for bimanual Franka configuration"
@@ -241,20 +245,31 @@ class FrankaOscClientCartesianAgent(Agent):
                 if extrinsics is not None:
                     cam_obs["pose"] = np.concatenate([extrinsics["position"], extrinsics["wxyz"]])
                     cam_obs["pose_mat"] = extrinsics["pose_mat"]
-        # DEBUG: print top-level keys and camera structure before sending
-        print(f"[DEBUG msgpack] top-level keys: {list(self.obs.keys())}")
-        for k, v in self.obs.items():
-            if isinstance(v, dict):
-                img_keys = list(v.get("images", {}).keys()) if "images" in v else None
-                print(f"  [{k}] keys={list(v.keys())} images={img_keys}")
+        if self.debug_msgpack:
+            print(f"[DEBUG msgpack] top-level keys: {list(self.obs.keys())}")
+            for k, v in self.obs.items():
+                if isinstance(v, dict):
+                    img_keys = list(v.get("images", {}).keys()) if "images" in v else None
+                    print(f"  [{k}] keys={list(v.keys())} images={img_keys}")
         response = self.franka_client.send_request(self.obs)
 
         if response.get(b"left") is not None:
             self.hyrl_joint_pos = np.asarray(response.get(b"left").get(b"joint_pos"), dtype=np.float32)
             self.hyrl_gripper_pos = np.asarray(response.get(b"left").get(b"gripper"), dtype=np.float32)
-        print(response)
+        if self.debug_msgpack:
+            print(response)
 
         left_target = np.asarray(self.ik.joints["left"], dtype=np.float32)
+        if self.hold_on_empty_response and response.get(b"left") is None:
+            current_left = self._extract_joint_pos(obs, "left")
+            if current_left is not None and len(current_left) >= 7:
+                current_left = np.asarray(current_left, dtype=np.float32)
+                if len(current_left) == len(left_target):
+                    left_target = current_left.copy()
+                elif len(current_left) == len(left_target) - 1:
+                    left_target = np.concatenate([current_left, [self.left_gripper_slider_handle.value]]).astype(
+                        np.float32
+                    )
         left_target[-1] = self.left_gripper_slider_handle.value
         action: Dict[str, Dict[str, np.ndarray]] = {"left": {"pos": left_target}}
 

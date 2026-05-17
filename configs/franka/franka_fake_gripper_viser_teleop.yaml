@@ -1,0 +1,25 @@
+version: "1"
+
+session:
+  save_root: recordings
+
+nodes:
+  - type: ViserTeleopNode
+    name: franka_viser
+    agent_class: robots_realtime.agents.teleoperation.franka_pyroki_viser_agent:FrankaPyrokiViserAgent
+    agent_kwargs:
+      viser_port: 8765
+      ik_rate: 30.0
+      robotiq_gripper: false
+      visualize_rgbd: false
+    arm_key: left
+    ik_freq: 30.0
+    viz_freq: 20.0
+    state_topics:
+      left: franka/joint_state
+
+  - type: RobotNode
+    name: franka
+    robot_config: robot_configs/franka/franka_fake_gripper.yaml
+    cmd_topic: franka_viser/joint_pos
+    poll_freq: 100.0

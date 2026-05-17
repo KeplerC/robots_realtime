@@ -36,7 +36,7 @@ KD_6D = np.array([KD_pos] * 3 + [KD_ori] * 3)
 # Kp_null = np.array([50.0, 50.0, 50.0, 50.0, 40.0, 25.0, 25.0])
 # Kp_null = np.array([30.0, 30.0, 25.0, 25.0, 20.0, 10.0, 10.0])
 # Kp_null = np.array([2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0])
-Kp_null = np.array([5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0])
+Kp_null = np.array([25.0, 25.0, 22.0, 20.0, 14.0, 10.0, 10.0])
 
 # Kp_null = np.array([3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0])
 damping_ratio = 2.0
@@ -49,6 +49,9 @@ GRIPPER_MAX_WIDTH = 0.1
 GRIPPER_MOVE_THRESHOLD = 0.055
 GRIPPER_COMMAND_EPSILON = 1e-3
 GRIPPER_UPDATE_TIMEOUT_S = 0.05
+JOINT_TORQUE_LIMIT = 26.5
+WRIST_JOINT_TORQUE_LIMIT = 6.0
+DEFAULT_TORQUE_DAMPING = np.array([3.0, 3.0, 3.0, 3.0, 2.0, 2.0, 1.0])
 
 
 def orientation_error(current_rot: np.ndarray, desired_rot: np.ndarray) -> np.ndarray:
@@ -69,6 +72,9 @@ class FrankaPanda(Robot):
         password: Optional[str] = None,
         name: Optional[str] = None,
         enable_gripper: bool = False,
+        load_mass: float = 0.0,
+        load_com: Optional[list[float]] = None,
+        load_inertia: Optional[list[float]] = None,
     ) -> None:
         """Initialize the Franka Panda robot arm without gripper.
 
@@ -88,8 +94,12 @@ class FrankaPanda(Robot):
             "username": username,
             "password": password,
             "name": name,
+            "enable_gripper": enable_gripper,
+            "load_mass": load_mass,
+            "load_com": load_com,
+            "load_inertia": load_inertia,
         }
-        self._initialize(host_name, username, password, name, enable_gripper)
+        self._initialize(host_name, username, password, name, enable_gripper, load_mass, load_com, load_inertia)
 
     def _initialize(
         self,
@@ -98,6 +108,9 @@ class FrankaPanda(Robot):
         password: Optional[str] = None,
         name: Optional[str] = None,
         enable_gripper: bool = False,
+        load_mass: float = 0.0,
+        load_com: Optional[list[float]] = None,
+        load_inertia: Optional[list[float]] = None,
     ) -> None:
         """Internal method to handle the actual initialization."""
 
@@ -133,20 +146,37 @@ class FrankaPanda(Robot):
             self._gripper_thread.start()
 
         # reduce collision sensitivity for enabling contact rich behavoir
-        self.torque_limit = 26.5
+        self.torque_limit = JOINT_TORQUE_LIMIT
         self.interface.get_robot().set_collision_behavior([100.0] * 7, [100.0] * 7, [100.0] * 6, [100.0] * 6)
+        if load_mass > 0.0:
+            load_com = load_com if load_com is not None else [0.0, 0.0, 0.06]
+            load_inertia = load_inertia if load_inertia is not None else [
+                0.001,
+                0.0,
+                0.0,
+                0.0,
+                0.001,
+                0.0,
+                0.0,
+                0.0,
+                0.001,
+            ]
+            self.interface.get_robot().set_load(float(load_mass), load_com, load_inertia)
+            logger.info("Configured Franka load compensation: mass=%s kg com=%s", load_mass, load_com)
         self.model = self.interface.get_model()
         self.frame = panda_py.libfranka.Frame.kFlange
 
+        self._cmd_lock = Lock()
+        self._joint_cmd = self.get_joint_pos()
         self.ctrl = controllers.AppliedTorque()
+        self.ctrl.set_damping(DEFAULT_TORQUE_DAMPING.astype(np.float64))
+        self.ctrl.set_control(np.asarray(self.model.coriolis(self.state), dtype=np.float64))
         print("starting controller")
 
         self.interface.start_controller(self.ctrl)
 
         print("controller started")
 
-        self._cmd_lock = Lock()
-        self._joint_cmd = self.get_joint_pos()
         self.ctrl_thread_start_time = time.time()
         self._server_thread = Thread(target=self.run, name="control_loop")
         self._server_thread.start()
@@ -163,6 +193,8 @@ class FrankaPanda(Robot):
             "kp_null": Kp_null,
             "kd_null": Kd_null,
             "damping_ratio": damping_ratio,
+            "torque_limit": self.torque_limit,
+            "wrist_joint_torque_limit": WRIST_JOINT_TORQUE_LIMIT,
         }
 
     def run(self) -> None:
@@ -255,21 +287,10 @@ class FrankaPanda(Robot):
                         tau_null = (np.eye(self._num_dofs) - J.T @ Jbar.T) @ dq_null
 
                     # command torque
-                    tau = tau_task + tau_null
+                    coriolis = np.array(self.model.coriolis(state), dtype=np.float64)
+                    tau = tau_task + tau_null + coriolis
                     tau = np.clip(tau, -self.torque_limit, self.torque_limit)
-                    tau[-1] = np.clip(tau[-1], -1.25, 1.25)
-                    time_buff = 20.00
-                    if time.time() - self.ctrl_thread_start_time < time_buff and np.linalg.norm(err_6d) > 0.01:
-                        # start with 2.0 then slowly increase to 100.0 as ctrl_thread_start_time gets closer to time_buff
-                        clip_value = 1.0 + np.clip(
-                            (20.0 - 1.0) * ((time.time() - self.ctrl_thread_start_time) - 5.0) / time_buff, 0.0, 20.0
-                        )
-                        tau = np.clip(
-                            tau, -clip_value, clip_value
-                        )  # If far away from home pose at init, clip torque to avoid high velocity homing
-                        print(f"Clipping torque to {clip_value}")
-                        print(tau)
-
+                    tau[-1] = np.clip(tau[-1], -WRIST_JOINT_TORQUE_LIMIT, WRIST_JOINT_TORQUE_LIMIT)
                     self.ctrl.set_control(tau)
 
                     if self._joint_state_saver is not None:

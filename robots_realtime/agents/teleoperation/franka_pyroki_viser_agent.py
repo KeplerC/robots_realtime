@@ -66,6 +66,7 @@ class FrankaPyrokiViserAgent(Agent):
         self.ik_thread.start()
 
         self.obs: Optional[Dict[str, Any]] = None
+        self._synced_to_real = False
         self._update_period = 0.05
         self._setup_visualization()
 
@@ -209,6 +210,13 @@ class FrankaPyrokiViserAgent(Agent):
     # ------------------------------------------------------------------
     def act(self, obs: Dict[str, Any]) -> Dict[str, Dict[str, np.ndarray]]:
         self.obs = deepcopy(obs)
+
+        left_joint_pos = self._extract_joint_pos(self.obs, "left")
+        if not self._synced_to_real:
+            if left_joint_pos is None:
+                return {}
+            self.ik.sync_to_joint_pos(left_joint_pos, "left")
+            self._synced_to_real = True
 
         left_target = np.asarray(self.ik.joints["left"], dtype=np.float32)
         left_target[-1] = self.left_gripper_slider_handle.value
