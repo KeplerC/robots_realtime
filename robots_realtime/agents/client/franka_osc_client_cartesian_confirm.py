@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -12,6 +14,7 @@ import viser
 import viser.extras
 import viser.transforms as vtf
 from dm_env.specs import Array
+from scipy.spatial.transform import Rotation
 
 from robots_realtime.agents.agent import Agent
 from robots_realtime.robots.inverse_kinematics.franka_pyroki import FrankaPyroki
@@ -43,6 +46,9 @@ class FrankaOscClientCartesianConfirmAgent(Agent):
         client_port: int = 9000,
         debug_msgpack: bool = False,
         hold_on_empty_response: bool = False,
+        show_ik_gizmo: bool = True,
+        wrist_cam_key: Optional[str] = None,
+        wrist_cam_extrinsic_file: Optional[str] = None,
     ) -> None:
         self.bimanual = bimanual
         self.robotiq_gripper = robotiq_gripper
@@ -50,6 +56,12 @@ class FrankaOscClientCartesianConfirmAgent(Agent):
         self.visualize_rgbd = visualize_rgbd
         self.debug_msgpack = debug_msgpack
         self.hold_on_empty_response = hold_on_empty_response
+        self.show_ik_gizmo = show_ik_gizmo
+        self.wrist_cam_key = wrist_cam_key
+        self._T_gripper_cam: Optional[np.ndarray] = None
+        if wrist_cam_extrinsic_file is not None:
+            with open(Path(wrist_cam_extrinsic_file)) as f:
+                self._T_gripper_cam = np.array(json.load(f)["T_gripper_cam"])
         if self.bimanual:
             assert right_arm_extrinsic is not None, (
                 "right_arm_extrinsic must be provided for bimanual Franka configuration"
@@ -106,6 +118,13 @@ class FrankaOscClientCartesianConfirmAgent(Agent):
             bimanual=bimanual,
             robot_description=robot_description,
         )
+        # Dedicated FK URDF for wrist-camera extrinsic computation. self.ik.urdf is
+        # continuously mutated by the IK thread (it writes the IK solution into the
+        # same URDF cfg), so reading FK from it returns the IK-target pose instead of
+        # the real robot pose. Keep a separate copy that we only update with real
+        # joint state.
+        self._fk_urdf = deepcopy(self.ik.urdf)
+
         self.ik_thread = threading.Thread(target=self.ik.run, name="franka_pyroki_ik")
         self.ik_thread.daemon = True
         self.ik_thread.start()
@@ -541,6 +560,24 @@ class FrankaOscClientCartesianConfirmAgent(Agent):
 
         self.camera_frustum_handles: Dict[str, viser.CameraFrustumHandle] = {}
 
+        if self.wrist_cam_key is not None:
+            self.wrist_cam_pointcloud_toggle = self.viser_server.gui.add_checkbox(
+                label="Wrist Cam Point Cloud", initial_value=True
+            )
+            self.cam_color_mode_toggle = self.viser_server.gui.add_checkbox(
+                label="Color by Camera (green=side, red=wrist)", initial_value=False
+            )
+
+        if not self.show_ik_gizmo:
+            for mesh in self.ik.urdf_vis_left._meshes:
+                mesh.visible = False
+            if self.bimanual and hasattr(self.ik, "urdf_vis_right"):
+                for mesh in self.ik.urdf_vis_right._meshes:
+                    mesh.visible = False
+            for handle in self.ik.transform_handles.values():
+                if handle.control is not None:
+                    handle.control.visible = False
+
     def _update_visualization(self) -> None:
         """Continuously sync live robot state and camera frames into Viser."""
 
@@ -618,12 +655,33 @@ class FrankaOscClientCartesianConfirmAgent(Agent):
                     if self.visualize_rgbd:
                         self.camera_frustum_handles[key].image = resize_with_center_crop(image, 224, 224)
 
-                    extrinsics = obs_copy.get(key, {}).get("extrinsics")
-                    if extrinsics is not None:
-                        self.camera_frustum_handles[key].position = tuple(extrinsics["position"])
-                        self.camera_frustum_handles[key].wxyz = extrinsics["wxyz"]
+                    if key == self.wrist_cam_key and self._T_gripper_cam is not None:
+                        if left_joint_pos is not None:
+                            joint_names = [f"panda_joint{i}" for i in range(1, 8)]
+                            self._fk_urdf.update_cfg(
+                                dict(zip(joint_names, np.asarray(left_joint_pos)[:7]))
+                            )
+                            T_base_hand = self._fk_urdf.get_transform(
+                                "panda_hand", "panda_link0"
+                            )
+                            T_base_cam = T_base_hand @ self._T_gripper_cam
+                            pos = T_base_cam[:3, 3].astype(np.float32)
+                            q_xyzw = Rotation.from_matrix(T_base_cam[:3, :3]).as_quat()
+                            wxyz = np.array([q_xyzw[3], q_xyzw[0], q_xyzw[1], q_xyzw[2]], dtype=np.float32)
+                            self.camera_frustum_handles[key].position = tuple(pos)
+                            self.camera_frustum_handles[key].wxyz = wxyz
+                    else:
+                        extrinsics = obs_copy.get(key, {}).get("extrinsics")
+                        if extrinsics is not None:
+                            self.camera_frustum_handles[key].position = tuple(extrinsics["position"])
+                            self.camera_frustum_handles[key].wxyz = extrinsics["wxyz"]
 
-                    if "depth_data" in obs_copy[key] and self.visualize_rgbd:
+                    wrist_pc_enabled = (
+                        key != self.wrist_cam_key
+                        or not hasattr(self, "wrist_cam_pointcloud_toggle")
+                        or self.wrist_cam_pointcloud_toggle.value
+                    )
+                    if "depth_data" in obs_copy[key] and self.visualize_rgbd and wrist_pc_enabled:
                         depth_data = obs_copy[key]["depth_data"]
                         points, colors = depth_color_to_pointcloud(
                             depth=depth_data,
@@ -634,11 +692,18 @@ class FrankaOscClientCartesianConfirmAgent(Agent):
                             subsample_factor=4,
                             depth_clip_range=(0.015, 1.2),
                         )
+                        color_mode_on = (
+                            hasattr(self, "cam_color_mode_toggle")
+                            and self.cam_color_mode_toggle.value
+                        )
+                        if color_mode_on:
+                            solid = [255, 0, 0] if key == self.wrist_cam_key else [0, 255, 0]
+                            colors = np.full((len(points), 3), solid, dtype=np.uint8)
                         self.viser_server.scene.add_point_cloud(
                             name=f"camera_frustum_{key}/point_cloud_{key}",
                             points=points,
                             colors=colors,
-                            point_size=0.002,
+                            point_size=0.0008 if color_mode_on else 0.002,
                         )
 
                 time.sleep(self._update_period)
