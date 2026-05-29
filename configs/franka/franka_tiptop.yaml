@@ -1,0 +1,42 @@
+# Minimal robots_realtime config for tiptop integration.
+#
+# Tiptop owns the wrist ZED directly via stream_ip and runs the policy server
+# on 127.0.0.1:9001. This config brings up only:
+#   - MessageBus broker (built into Session)
+#   - RobotNode publishing franka/joint_state, subscribing franka_viser/joint_pos
+#   - ViserTeleopNode hosting FrankaOscClientCartesianAgent, which polls tiptop
+#     on :9001 for trajectories.
+#
+# Bring-up order:
+#   1. Start tiptop process (it brings up the 9001 server in get_robot_client()).
+#   2. `rr-session run configs/franka/franka_tiptop.yaml` from robots_realtime.
+
+version: "1"
+
+session:
+  save_root: recordings
+
+nodes:
+  - type: ViserTeleopNode
+    name: franka_viser
+    agent_class: robots_realtime.agents.client.franka_osc_client_cartesian:FrankaOscClientCartesianAgent
+    agent_kwargs:
+      viser_port: 8765
+      robotiq_gripper: true
+      visualize_rgbd: false
+      client_host: "127.0.0.1"
+      client_port: 9001
+      hold_on_empty_response: true
+      debug_msgpack: true
+    arm_key: left
+    ik_freq: 100.0
+    viz_freq: 20.0
+    state_topics:
+      left: franka/joint_state
+    image_topics: {}
+
+  - type: RobotNode
+    name: franka
+    robot_config: robot_configs/franka/franka_robotiq_gripper.yaml
+    cmd_topic: franka_viser/joint_pos
+    poll_freq: 100.0

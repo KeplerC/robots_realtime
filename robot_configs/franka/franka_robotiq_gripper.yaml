@@ -7,6 +7,6 @@ robots:
     load_inertia: [0.001, 0.0, 0.0, 0.0, 0.001, 0.0, 0.0, 0.0, 0.001]
 
   - _target_: robots_realtime.robots.robotiq_gripper.RobotiqGripperRobot
-    port: "/dev/robotiq"
+    port: "auto"
     default_speed: 255
     default_force: 40

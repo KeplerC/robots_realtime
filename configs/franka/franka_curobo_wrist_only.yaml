@@ -1,3 +1,14 @@
+# Franka + CuRobo bridge — WRIST CAMERA ONLY.
+#
+# Fork of franka_curobo_all_cam.yaml with the `camera_top` CameraNode
+# removed. Streaming one ZED instead of two halves the bridge-side GPU
+# footprint (each ZED runs a NEURAL_PLUS depth net costing ~0.7-1 GB),
+# leaving room for SAM3 + GroundingDINO + CuRobo on an 8 GB GPU.
+#
+# Pair with examples/libero_pro/full_popcorn_cycle/task_real.yaml, which
+# declares environment.cameras: [robot0_eye_in_hand]. franka_real_env
+# maps the wire key `camera_wrist` -> vOS `robot0_eye_in_hand` by role.
+
 version: "1"
 
 session:
@@ -22,7 +33,6 @@ nodes:
     state_topics:
       left: franka/joint_state
     image_topics:
-      camera_top: camera_top/rgb
       camera_wrist: camera_wrist/rgb
 
   - type: RobotNode
@@ -32,17 +42,8 @@ nodes:
     poll_freq: 100.0
 
   - type: CameraNode
-    name: camera_top
-    driver: ZedCamera
-    device_id: "35062621"
-    resolution: HD720
-    fps: 30
-    enable_depth: true
-    extrinsics_file: configs/camera_extrinsics/autolab_franka_zed_top.yaml
-
-  - type: CameraNode
     name: camera_wrist
     driver: ZedCamera
-    stream_ip: "172.16.0.3"
+    stream_ip: "10.65.87.121"
     enable_depth: true
     resolution: HD720

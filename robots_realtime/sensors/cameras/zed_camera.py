@@ -53,6 +53,9 @@ Zed 2 supported resolution and fps:
 376p (VGA): 15, 30, 60, 100
 """
 
+# Wrist ZED camera (GMSL on remote machine, streamed via ZED SDK)
+WRIST_ZED_SERIAL = 55309737
+
 
 class STEREO_OR_MONO(Enum):
     STEREO = "stereo"
@@ -72,9 +75,10 @@ class ZedCamera(CameraDriver):
     name: str | None = None
     enable_depth: bool = False
     extrinsics_file: str | None = None  # path to a camera extrinsics YAML (see configs/camera_extrinsics/)
+    stream_ip: str | None = None  # "host" or "host:port" — open as ZED streaming receiver instead of local USB
 
     def __repr__(self) -> str:
-        return f"ZedCamera(device_id={self.device_id!r}, name={self.name!r}, resolution={self.resolution}, fps={self.fps})"
+        return f"ZedCamera(device_id={self.device_id!r}, stream_ip={self.stream_ip!r}, name={self.name!r}, resolution={self.resolution}, fps={self.fps})"
 
     @classmethod
     def check_available_cameras(cls: type["ZedCamera"]) -> None:
@@ -89,22 +93,24 @@ class ZedCamera(CameraDriver):
 
         # Create a InitParameters object and set configuration parameters
         init_params = sl.InitParameters()
-        if self.device_id:
-            init_params.set_from_serial_number(int(self.device_id))
-        init_params.camera_resolution = RESOLUTION_MAP[self.resolution]
-        self.width, self.height = RESOLUTION_SIZE_MAP[self.resolution]
-        # Use HD720 opr HD1200 video mode, depending on camera type.
-        # if self.fps not in RESOLUTION_TO_VALID_FPS[self.resolution]:
-        #     raise ValueError(f"Invalid fps for resolution {self.resolution}. Valid fps are {RESOLUTION_TO_VALID_FPS[self.resolution]}")
-        init_params.camera_fps = self.fps  # Set fps at 30
+        if self.stream_ip:
+            host = self.stream_ip.split(":")[0]
+            port = int(self.stream_ip.split(":")[1]) if ":" in self.stream_ip else 30000
+            init_params.set_from_stream(host, port)
+            # Resolution and fps are determined by the sender when streaming
+            self.width, self.height = RESOLUTION_SIZE_MAP.get(self.resolution, (1280, 720))
+        else:
+            if self.device_id:
+                init_params.set_from_serial_number(int(self.device_id))
+            init_params.camera_resolution = RESOLUTION_MAP[self.resolution]
+            self.width, self.height = RESOLUTION_SIZE_MAP[self.resolution]
+            init_params.camera_fps = self.fps
         if self.enable_depth:
             init_params.depth_mode = sl.DEPTH_MODE.NEURAL_PLUS
             init_params.coordinate_units = sl.UNIT.METER
 
         else:
             init_params.depth_mode = sl.DEPTH_MODE.NONE
-
-        # init_params.depth_mode = sl.DEPTH_MODE.NEURAL_PLUS
 
         # Open the camera
         err = self.zed.open(init_params)
@@ -127,13 +133,18 @@ class ZedCamera(CameraDriver):
         self.camera_info = self.zed.get_camera_information()
         self.runtime_parameters = sl.RuntimeParameters()
         self.runtime_parameters.confidence_threshold = 75
-        # self.runtime_parameters.texture_confidence_threshold = 99
         self.camera_type = self.camera_info.camera_model.name
 
         self.intrinsic_data = {
             "left": self._load_intrinsic_data("left"),
             "right": self._load_intrinsic_data("right"),
         }
+
+        # For streaming, read actual resolution from camera info
+        if self.stream_ip:
+            cfg = self.camera_info.camera_configuration
+            self.width = cfg.resolution.width
+            self.height = cfg.resolution.height
 
         # Extract and save camera information once
         self.serial_number: int = self.camera_info.serial_number if self.device_id is None else int(self.device_id)
@@ -259,8 +270,6 @@ class ZedCamera(CameraDriver):
             else:
                 result = CameraData(images={"left_rgb": None, "right_rgb": None}, timestamp=-1.0)  # type: ignore
 
-        # end_time = time.time()
-        # print(f"time taken to read camera data: {(end_time - start_time) * 1000} ms")
         return result
 
     def read_calibration_data_intrinsics(self) -> dict:
@@ -298,5 +307,3 @@ if __name__ == "__main__":
         data = zed.read()
         print(f"frequency: {1 / (time.time() - t_start)}")
         t_start = time.time()
-
-    # plot_camera_read(zed)

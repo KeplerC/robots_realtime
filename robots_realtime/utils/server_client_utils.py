@@ -97,10 +97,15 @@ class SyncMsgpackNumpyClient:
     def __init__(self, host="0.0.0.0", port=9000):
         self._client = MsgpackNumpyClient(host, port)
         self._loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._loop)
-        self._loop.run_until_complete(self._client.connect())
+        self._connected = False
+
+    def _ensure_connected(self):
+        if not self._connected:
+            self._loop.run_until_complete(self._client.connect())
+            self._connected = True
 
     def send_request(self, data: dict) -> dict:
+        self._ensure_connected()
         return self._loop.run_until_complete(self._client.send_request(data))
 
     def close(self):

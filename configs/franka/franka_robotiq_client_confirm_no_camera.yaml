@@ -13,7 +13,7 @@ nodes:
       robotiq_gripper: true  # Match gripper-enabled robot config (8 DOF)
       visualize_rgbd: false
       client_host: "127.0.0.1"
-      client_port: 9000
+      client_port: 9001
       debug_msgpack: true
       hold_on_empty_response: true  # Hold current position until VOS sends a command
     arm_key: left

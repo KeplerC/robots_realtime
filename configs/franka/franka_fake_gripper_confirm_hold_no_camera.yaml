@@ -13,7 +13,7 @@ nodes:
       robotiq_gripper: true
       visualize_rgbd: false
       client_host: "127.0.0.1"
-      client_port: 9000
+      client_port: 9001
       debug_msgpack: true
       hold_on_empty_response: true
     arm_key: left

@@ -43,7 +43,7 @@ class FrankaOscClientCartesianConfirmAgent(Agent):
         robotiq_gripper: bool = False,
         viser_port: int = 8080,
         client_host: str = "0.0.0.0",
-        client_port: int = 9000,
+        client_port: int = 9001,
         debug_msgpack: bool = False,
         hold_on_empty_response: bool = False,
         show_ik_gizmo: bool = True,
@@ -744,6 +744,45 @@ class FrankaOscClientCartesianConfirmAgent(Agent):
                 if extrinsics is not None:
                     cam_obs["pose"] = np.concatenate([extrinsics["position"], extrinsics["wxyz"]])
                     cam_obs["pose_mat"] = extrinsics["pose_mat"]
+
+        # Wrist camera: the driver-side ``extrinsics`` are static (filled
+        # only when the CameraNode declares ``extrinsics_file``), and the
+        # streamed wrist ZED has none — so the loop above leaves its
+        # pose/pose_mat absent. Compute them dynamically here from live
+        # FK × T_gripper_cam so downstream consumers (e.g.
+        # geometry_svc.MaskToWorldPoints, which calls
+        # scipy.Rotation.from_quat) don't get a zero-norm quaternion on
+        # the wire. The same math already runs above for the Viser
+        # frustum gizmo (around line 658); this is the equivalent for
+        # the on-wire observation.
+        if (
+            self.wrist_cam_key is not None
+            and self._T_gripper_cam is not None
+            and self.wrist_cam_key in self.obs
+            and isinstance(self.obs[self.wrist_cam_key], dict)
+        ):
+            arm_obs = obs.get("left")
+            left_joint_pos = (
+                arm_obs.get("joint_pos") if isinstance(arm_obs, dict) else None
+            )
+            if left_joint_pos is not None:
+                joint_names = [f"panda_joint{i}" for i in range(1, 8)]
+                self._fk_urdf.update_cfg(
+                    dict(zip(joint_names, np.asarray(left_joint_pos)[:7]))
+                )
+                T_base_hand = np.asarray(
+                    self._fk_urdf.get_transform("panda_hand", "panda_link0"),
+                    dtype=np.float64,
+                )
+                T_base_cam = T_base_hand @ self._T_gripper_cam
+                pos = T_base_cam[:3, 3].astype(np.float32)
+                q_xyzw = Rotation.from_matrix(T_base_cam[:3, :3]).as_quat()
+                wxyz = np.array(
+                    [q_xyzw[3], q_xyzw[0], q_xyzw[1], q_xyzw[2]],
+                    dtype=np.float32,
+                )
+                self.obs[self.wrist_cam_key]["pose"] = np.concatenate([pos, wxyz])
+                self.obs[self.wrist_cam_key]["pose_mat"] = T_base_cam.astype(np.float32)
         if self.debug_msgpack:
             print(f"[DEBUG msgpack] top-level keys: {list(self.obs.keys())}")
             for k, v in self.obs.items():

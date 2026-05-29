@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -12,6 +14,7 @@ import viser
 import viser.extras
 import viser.transforms as vtf
 from dm_env.specs import Array
+from scipy.spatial.transform import Rotation
 
 from robots_realtime.agents.agent import Agent
 from robots_realtime.robots.inverse_kinematics.franka_pyroki import FrankaPyroki
@@ -39,11 +42,20 @@ class FrankaPyrokiViserAgent(Agent):
         visualize_rgbd: bool = True,
         robotiq_gripper: bool = False,
         viser_port: int = 8080,
+        wrist_cam_key: Optional[str] = None,
+        wrist_cam_extrinsic_file: Optional[str] = None,
     ) -> None:
         self.bimanual = bimanual
         self.right_arm_extrinsic = right_arm_extrinsic
         self.visualize_rgbd = visualize_rgbd
         self.robotiq_gripper = robotiq_gripper
+        self.wrist_cam_key = wrist_cam_key
+        self._T_gripper_cam: Optional[np.ndarray] = None
+        if wrist_cam_extrinsic_file is not None:
+            path = Path(wrist_cam_extrinsic_file)
+            with open(path) as f:
+                cal = json.load(f)
+            self._T_gripper_cam = np.array(cal["T_gripper_cam"])
         if self.bimanual:
             assert right_arm_extrinsic is not None, (
                 "right_arm_extrinsic must be provided for bimanual Franka configuration"
@@ -67,6 +79,9 @@ class FrankaPyrokiViserAgent(Agent):
 
         self.obs: Optional[Dict[str, Any]] = None
         self._synced_to_real = False
+        self._sync_cooldown: int = 0  # frames to hold IK snapshot after sync (lets IK thread settle)
+        self._hold_joints: Optional[np.ndarray] = None  # IK snapshot held during cooldown
+        self._user_set_gripper: bool = False  # echo observed gripper until user touches slider
         self._update_period = 0.05
         self._setup_visualization()
 
@@ -122,14 +137,29 @@ class FrankaPyrokiViserAgent(Agent):
 
         self.viser_cam_img_handles: Dict[str, viser.GuiImageHandle] = {}
 
+        if self.wrist_cam_key is not None:
+            self.wrist_cam_pointcloud_toggle = self.viser_server.gui.add_checkbox(
+                label="Wrist Cam Point Cloud", initial_value=True
+            )
+            self.cam_color_mode_toggle = self.viser_server.gui.add_checkbox(
+                label="Color by Camera (green=side, red=wrist)", initial_value=False
+            )
+
         if self.robotiq_gripper:
             self.left_gripper_slider_handle = self.viser_server.gui.add_slider(
-                label="Gripper Width", min=0.0, max=1.0, step=0.005, initial_value=1.0
+                label="Gripper Width (echo observed)", min=0.0, max=1.0, step=0.005, initial_value=1.0
             )
         else:
             self.left_gripper_slider_handle = self.viser_server.gui.add_slider(
-                label="Gripper Width", min=0.0, max=0.1, step=0.001, initial_value=0.1
+                label="Gripper Width (echo observed)", min=0.0, max=0.1, step=0.001, initial_value=0.1
             )
+
+        @self.left_gripper_slider_handle.on_update
+        def _on_gripper_update(_):
+            if not self._user_set_gripper:
+                self._user_set_gripper = True
+                self.left_gripper_slider_handle.label = "Gripper Width"
+
         if self.bimanual:
             self.right_gripper_slider_handle = self.viser_server.gui.add_slider(
                 label="Gripper Width (R)", min=0.0, max=0.1, step=0.001, initial_value=0.1
@@ -180,12 +210,30 @@ class FrankaPyrokiViserAgent(Agent):
                     if self.visualize_rgbd:
                         self.camera_frustum_handles[key].image = resize_with_center_crop(image, 224, 224)
 
-                    extrinsics = obs_copy.get(key, {}).get("extrinsics")
-                    if extrinsics is not None:
-                        self.camera_frustum_handles[key].position = tuple(extrinsics["position"])
-                        self.camera_frustum_handles[key].wxyz = extrinsics["wxyz"]
+                    if key == self.wrist_cam_key and self._T_gripper_cam is not None:
+                        left_joint_pos = self._extract_joint_pos(obs_copy, "left")
+                        if left_joint_pos is not None:
+                            joint_names = [f"panda_joint{i}" for i in range(1, 8)]
+                            self.ik.urdf.update_cfg(dict(zip(joint_names, left_joint_pos[:7])))
+                            T_base_hand = self.ik.urdf.get_transform("panda_hand", "panda_link0")
+                            T_base_cam = T_base_hand @ self._T_gripper_cam
+                            pos = T_base_cam[:3, 3].astype(np.float32)
+                            q_xyzw = Rotation.from_matrix(T_base_cam[:3, :3]).as_quat()
+                            wxyz = np.array([q_xyzw[3], q_xyzw[0], q_xyzw[1], q_xyzw[2]], dtype=np.float32)
+                            self.camera_frustum_handles[key].position = tuple(pos)
+                            self.camera_frustum_handles[key].wxyz = wxyz
+                    else:
+                        extrinsics = obs_copy.get(key, {}).get("extrinsics")
+                        if extrinsics is not None:
+                            self.camera_frustum_handles[key].position = tuple(extrinsics["position"])
+                            self.camera_frustum_handles[key].wxyz = extrinsics["wxyz"]
 
-                    if "depth_data" in obs_copy[key] and self.visualize_rgbd:
+                    wrist_pc_enabled = (
+                        key != self.wrist_cam_key
+                        or not hasattr(self, "wrist_cam_pointcloud_toggle")
+                        or self.wrist_cam_pointcloud_toggle.value
+                    )
+                    if "depth_data" in obs_copy[key] and self.visualize_rgbd and wrist_pc_enabled:
                         depth_data = obs_copy[key]["depth_data"]
                         points, colors = depth_color_to_pointcloud(
                             depth=depth_data,
@@ -196,11 +244,18 @@ class FrankaPyrokiViserAgent(Agent):
                             subsample_factor=4,
                             depth_clip_range=(0.015, 1.2),
                         )
+                        color_mode_on = (
+                            hasattr(self, "cam_color_mode_toggle")
+                            and self.cam_color_mode_toggle.value
+                        )
+                        if color_mode_on:
+                            solid = [255, 0, 0] if key == self.wrist_cam_key else [0, 255, 0]
+                            colors = np.full((len(points), 3), solid, dtype=np.uint8)
                         self.viser_server.scene.add_point_cloud(
                             name=f"camera_frustum_{key}/point_cloud_{key}",
                             points=points,
                             colors=colors,
-                            point_size=0.002,
+                            point_size=0.0008 if color_mode_on else 0.002,
                         )
 
                 time.sleep(self._update_period)
@@ -216,10 +271,26 @@ class FrankaPyrokiViserAgent(Agent):
             if left_joint_pos is None:
                 return {}
             self.ik.sync_to_joint_pos(left_joint_pos, "left")
+            # Snapshot IK output immediately after sync (ik.joints["left"] was just set to
+            # real joints by sync_to_joint_pos). Hold this snapshot during cooldown so we
+            # don't follow a transient bad IK solution caused by the IK thread racing with
+            # the gizmo update inside sync_to_joint_pos.
+            self._hold_joints = np.asarray(self.ik.joints["left"], dtype=np.float32).copy()
+            self._sync_cooldown = 10  # ~0.33 s at 30 Hz
             self._synced_to_real = True
 
+        # Hold the snapshot steady while IK settles.
+        if self._sync_cooldown > 0:
+            self._sync_cooldown -= 1
+            return {"left": {"pos": self._hold_joints.copy()}}
+
         left_target = np.asarray(self.ik.joints["left"], dtype=np.float32)
-        left_target[-1] = self.left_gripper_slider_handle.value
+        # Echo the observed gripper value until the user moves the slider.
+        if not self._user_set_gripper and left_joint_pos is not None and len(left_joint_pos) > 7:
+            left_target[-1] = float(left_joint_pos[-1])
+        else:
+            left_target[-1] = self.left_gripper_slider_handle.value
+
         action: Dict[str, Dict[str, np.ndarray]] = {"left": {"pos": left_target}}
 
         if self.bimanual:

@@ -11,17 +11,17 @@ commands) and the `rr-session` client (drives the real Franka and shows Viser).
 ### 1. Start the GaP sim_bridge server
 
 ```bash
-cd /home/r2d2/graph-as-policy
+cd /home/r2d2/gap_popcorn
 uv run python services/sim_bridge/server.py --port 50060 --init-suite franka_real
 ```
 
 What this brings up:
 - `127.0.0.1:50060` — gRPC services (`SimBridge`, `Observation`, `Gripper`, `RobotControl`)
-- `127.0.0.1:9000` — `MsgpackNumpyServer` inside `FrankaRealEnv`, the rendezvous
+- `0.0.0.0:9001` — `MsgpackNumpyServer` inside `FrankaRealEnv`, the rendezvous
   point the rr-session confirm agent connects to
 
-`--init-suite franka_real` runs the `Init` step at startup so port 9000 opens
-immediately. Without it, port 9000 only opens after some external caller issues
+`--init-suite franka_real` runs the `Init` step at startup so port 9001 opens
+immediately. Without it, port 9001 only opens after some external caller issues
 `Init(suite_name="franka_real")` over gRPC.
 
 The server does **not** connect to the robot itself; it just waits for the
@@ -29,7 +29,7 @@ rr-session client to push observations and (optionally) for a GaP policy to
 push commands back through it. Safe to leave running.
 
 Log to follow: `/tmp/sim_bridge.log` (if you tee it) — look for
-`[MsgpackServer] listening on 127.0.0.1:9000` and `[SimBridge.Init] Success!`.
+`[MsgpackServer] listening on 0.0.0.0:9001` and `[SimBridge.Init] Success!`.
 
 ### 2. Start the rr-session client
 
@@ -48,6 +48,12 @@ pushes a command. The Viser IK gizmo is **ignored** in this mode — confirm-flo
 configs only execute commands routed through the msgpack server.
 
 ## GaP `vos eval` workflow (delta_move example)
+
+> **Stale — written against the older `graph-as-policy` checkout.** The
+> `delta_move` example and `examples/franka_platform_curobo_only.yaml` do not
+> exist in `gap_popcorn`, and `gap_popcorn`'s msgpack bridge now owns port
+> 9001 — which collides with the Ray Serve `grpc_port: 9001` described below.
+> This section needs a rewrite against `gap_popcorn` before use.
 
 Runs a pre-built CuRobo workflow that moves the EE by a fixed `(dx, dy, dz)`
 delta in the world frame. Three processes need to be up:

@@ -13,7 +13,7 @@ nodes:
       robotiq_gripper: true
       visualize_rgbd: false
       client_host: "0.0.0.0"
-      client_port: 9000
+      client_port: 9001
     arm_key: left
     ik_freq: 100.0
     viz_freq: 20.0
