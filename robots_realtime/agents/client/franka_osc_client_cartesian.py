@@ -49,6 +49,7 @@ class FrankaOscClientCartesianAgent(Agent):
         hold_on_empty_response: bool = False,
         wrist_cam_key: Optional[str] = None,
         wrist_cam_extrinsic_file: Optional[str] = None,
+        spline_interp: bool = True,
     ) -> None:
         self.bimanual = bimanual
         self.robotiq_gripper = robotiq_gripper
@@ -131,6 +132,24 @@ class FrankaOscClientCartesianAgent(Agent):
         self._trajectory_min_segment_dt: float = 0.12     # s
         self._trajectory_min_duration: float = 1.0        # s
         self._active_trajectory_settle_timeout_s: float = 5.0
+
+        # Optional PCHIP (monotone-cubic) interpolation of the active
+        # trajectory. ADDITIVE: the linear path (_active_trajectory_target)
+        # is left exactly as-is and is used verbatim when this flag is False
+        # or whenever the spline can't be built. PCHIP is C1 (continuous
+        # velocity across waypoints) and monotone (no overshoot off the
+        # planned waypoints), so the OSC sees a smooth joint reference and
+        # the per-waypoint shake of the linear lerp goes away — see
+        # _active_trajectory_target_spline. Set spline_interp=False (e.g. via
+        # agent_kwargs in the franka config yaml) to restore the exact prior
+        # linear behavior.
+        self._spline_interp = spline_interp
+        self._active_spline = None
+        self._active_spline_id: Optional[bytes] = None
+        print(
+            f"[TRAJECTORY] interpolation = "
+            f"{'PCHIP spline (linear fallback retained)' if spline_interp else 'linear'}"
+        )
 
         self._setup_visualization()
 
@@ -414,6 +433,87 @@ class FrankaOscClientCartesianAgent(Agent):
         ).astype(np.float32)
         return target
 
+    def _get_active_spline(self):
+        """Build (and cache) a PCHIP interpolant for the active trajectory.
+
+        Monotone cubic over (``_active_trajectory_times``, waypoints): C1
+        (continuous velocity) and overshoot-free, so the sampled path stays
+        within the planned waypoints — it does NOT bow off the straight line
+        — while removing the velocity corners the linear lerp leaves at each
+        waypoint. Cached per ``_active_trajectory_id``; rebuilt when a new
+        trajectory activates. Returns ``None`` (so callers fall back to the
+        linear method) when the flag is off, there are <2 waypoints, or scipy
+        / the build is unavailable.
+        """
+        if not self._spline_interp:
+            return None
+        traj = self._active_trajectory
+        times = self._active_trajectory_times
+        if traj is None or times is None or len(traj) < 2:
+            return None
+        if (
+            self._active_spline is not None
+            and self._active_spline_id == self._active_trajectory_id
+        ):
+            return self._active_spline
+        try:
+            from scipy.interpolate import PchipInterpolator
+
+            # times is strictly increasing (each segment_dt >=
+            # _trajectory_min_segment_dt > 0), which PCHIP requires.
+            spline = PchipInterpolator(
+                np.asarray(times, dtype=np.float64),
+                np.asarray(traj, dtype=np.float64),
+                axis=0,
+                extrapolate=False,
+            )
+        except Exception as exc:  # scipy missing / non-monotone x / etc.
+            print(f"[TRAJECTORY] spline build failed ({exc}); using linear interp")
+            self._active_spline = None
+            self._active_spline_id = None
+            return None
+        self._active_spline = spline
+        self._active_spline_id = self._active_trajectory_id
+        return spline
+
+    def _active_trajectory_target_spline(
+        self, obs: Dict[str, Any]
+    ) -> Optional[np.ndarray]:
+        """PCHIP-smoothed variant of :meth:`_active_trajectory_target`.
+
+        Only the *interior* interpolation differs: it samples the cached
+        monotone-cubic spline instead of linearly lerping between the two
+        bracketing waypoints, so the joint reference — and therefore the EE
+        pose the OSC servos to — has continuous velocity across waypoints
+        (no per-waypoint corner, hence no shake). Everything that decides
+        *correctness* — start-time latching, the end-of-trajectory final
+        waypoint latch, the completion tolerance, and the settle-timeout —
+        is delegated to the linear method, so endpoint/grasp accuracy and
+        when the trajectory finishes are byte-for-byte identical to the
+        linear path. Falls back to the linear method whenever the spline is
+        unavailable or would produce a non-finite sample.
+        """
+        if self._active_trajectory is None or self._active_trajectory_times is None:
+            return None
+        spline = self._get_active_spline()
+        if spline is None:
+            return self._active_trajectory_target(obs)
+        times = self._active_trajectory_times
+        if self._active_trajectory_start_time is None:
+            self._active_trajectory_start_time = time.monotonic()
+        elapsed = max(0.0, time.monotonic() - self._active_trajectory_start_time)
+        duration = float(times[-1]) if len(times) > 0 else 0.0
+        # Endpoint / settle / finish handling is interpolation-agnostic — the
+        # linear method latches the exact final waypoint and runs the
+        # completion/settle logic, so reuse it verbatim at/after the end.
+        if len(self._active_trajectory) == 1 or elapsed >= duration:
+            return self._active_trajectory_target(obs)
+        # Interior: smooth monotone-cubic sample (in-range, so finite).
+        target = np.asarray(spline(elapsed), dtype=np.float32)
+        if not np.all(np.isfinite(target)):
+            return self._active_trajectory_target(obs)
+        return target
+
     def act(self, obs: Dict[str, Any]) -> Dict[str, Dict[str, np.ndarray]]:
         self.obs = deepcopy(obs)
 
@@ -504,7 +604,12 @@ class FrankaOscClientCartesianAgent(Agent):
 
         # Trajectory mode wins over the single-point path. When an active
         # trajectory exists, emit its time-interpolated target every tick.
-        traj_target = self._active_trajectory_target(obs)
+        # PCHIP-smoothed when enabled (falls back to the linear method
+        # internally on any issue); the plain linear path is preserved below.
+        if self._spline_interp:
+            traj_target = self._active_trajectory_target_spline(obs)
+        else:
+            traj_target = self._active_trajectory_target(obs)
         if traj_target is not None:
             grip_val = (
                 self._active_trajectory_gripper
