@@ -1,0 +1,32 @@
+{
+  "visual_mesh": "plate.obj",
+  "collision_meshes": [
+    "plate_collision_0.obj",
+    "plate_collision_1.obj",
+    "plate_collision_2.obj",
+    "plate_collision_3.obj",
+    "plate_collision_4.obj",
+    "plate_collision_5.obj",
+    "plate_collision_6.obj",
+    "plate_collision_7.obj",
+    "plate_collision_8.obj",
+    "plate_collision_9.obj",
+    "plate_collision_10.obj",
+    "plate_collision_11.obj",
+    "plate_collision_12.obj",
+    "plate_collision_13.obj",
+    "plate_collision_14.obj",
+    "plate_collision_15.obj",
+    "plate_collision_16.obj",
+    "plate_collision_17.obj",
+    "plate_collision_18.obj"
+  ],
+  "visual_submeshes": [
+    {
+      "mesh_file": "plate_visual_0.obj",
+      "texture_file": "plate_visual_0.png",
+      "material_name": "plate_mat_0"
+    }
+  ],
+  "mesh_scale": 0.2
+}

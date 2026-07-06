@@ -1,0 +1,19 @@
+{
+  "visual_mesh": "hammer.obj",
+  "collision_meshes": [
+    "hammer_collision_0.obj",
+    "hammer_collision_1.obj",
+    "hammer_collision_2.obj",
+    "hammer_collision_3.obj",
+    "hammer_collision_4.obj",
+    "hammer_collision_5.obj"
+  ],
+  "visual_submeshes": [
+    {
+      "mesh_file": "hammer_visual_0.obj",
+      "texture_file": "hammer_visual_0.png",
+      "material_name": "hammer_mat_0"
+    }
+  ],
+  "mesh_scale": 0.2
+}

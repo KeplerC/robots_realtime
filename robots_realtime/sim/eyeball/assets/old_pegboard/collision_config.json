@@ -1,0 +1,33 @@
+{
+  "visual_mesh": "pegboard.obj",
+  "collision_meshes": [
+    "pegboard_collision_0.obj",
+    "pegboard_collision_1.obj",
+    "pegboard_collision_2.obj",
+    "pegboard_collision_3.obj",
+    "pegboard_collision_4.obj",
+    "pegboard_collision_5.obj",
+    "pegboard_collision_6.obj",
+    "pegboard_collision_7.obj",
+    "pegboard_collision_8.obj",
+    "pegboard_collision_9.obj",
+    "pegboard_collision_10.obj",
+    "pegboard_collision_11.obj",
+    "pegboard_collision_12.obj",
+    "pegboard_collision_13.obj",
+    "pegboard_collision_14.obj",
+    "pegboard_collision_15.obj",
+    "pegboard_collision_16.obj",
+    "pegboard_collision_17.obj",
+    "pegboard_collision_18.obj",
+    "pegboard_collision_19.obj"
+  ],
+  "visual_submeshes": [
+    {
+      "mesh_file": "pegboard_visual_0.obj",
+      "texture_file": "pegboard_visual_0.png",
+      "material_name": "pegboard_mat_0"
+    }
+  ],
+  "mesh_scale": 0.4
+}

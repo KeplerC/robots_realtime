@@ -1,0 +1,41 @@
+# vOS-client launch: tape_handover_object_ood (eyeball task sim).
+#
+# Terminal 1 (sim):
+#   uv run rr-session configs/yam/sim_tasks/variants/tape_handover_object_ood.yaml
+# Terminal 2 (compose):
+#   uv run vos compose --task-file <your task.yaml>
+
+version: "1"
+
+session:
+  save_root: recordings
+
+nodes:
+  - type: ViserTeleopNode
+    name: yam_viser
+    agent_class: robots_realtime.agents.client.yam_vos_client:YamVosClientAgent
+    agent_kwargs:
+      viser_port: 8765
+      client_host: "0.0.0.0"
+      client_port: 9100
+      bimanual: true
+    ik_freq: 30.0
+    viz_freq: 15.0
+    state_topics:
+      left: yam/left_state
+      right: yam/right_state
+    image_topics:
+      camera_top: yam/exo_camera
+
+  - type: XdofSimNode
+    name: yam
+    eyeball_task: tape_handover_object_ood
+    eval_seed: 42
+    physics_dt: 0.0005
+    control_decimation: 17
+    camera_fps: 30.0
+    viser_port: 8766
+    vr_port: 8012
+    cmd_topics:
+      left: yam_viser/left_joint_pos
+      right: yam_viser/right_joint_pos

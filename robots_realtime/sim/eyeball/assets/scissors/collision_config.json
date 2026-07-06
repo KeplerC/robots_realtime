@@ -1,0 +1,35 @@
+{
+  "visual_mesh": "scissors.obj",
+  "collision_meshes": [
+    "scissors_collision_0.obj",
+    "scissors_collision_1.obj",
+    "scissors_collision_2.obj",
+    "scissors_collision_3.obj",
+    "scissors_collision_4.obj",
+    "scissors_collision_5.obj",
+    "scissors_collision_6.obj",
+    "scissors_collision_7.obj",
+    "scissors_collision_8.obj",
+    "scissors_collision_9.obj",
+    "scissors_collision_10.obj",
+    "scissors_collision_11.obj"
+  ],
+  "visual_submeshes": [
+    {
+      "mesh_file": "scissors_visual_0.obj",
+      "texture_file": "scissors_visual_0.png",
+      "material_name": "scissors_mat_0"
+    },
+    {
+      "mesh_file": "scissors_visual_1.obj",
+      "texture_file": "scissors_visual_1.png",
+      "material_name": "scissors_mat_1"
+    },
+    {
+      "mesh_file": "scissors_visual_2.obj",
+      "texture_file": "scissors_visual_2.png",
+      "material_name": "scissors_mat_2"
+    }
+  ],
+  "mesh_scale": 1.82
+}
