@@ -66,6 +66,8 @@ class Subscriber:
                             self._latest[parts[0].decode()] = envelope
                 except zmq.Again:
                     pass
+                except Exception:
+                    pass  # skip malformed messages (e.g. ExtraData on large payloads)
 
     def drain_one(self, timeout_ms: int = 50) -> bool:
         """Block up to *timeout_ms* waiting for any new message."""

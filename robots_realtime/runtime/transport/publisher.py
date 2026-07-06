@@ -42,6 +42,7 @@ class Publisher:
 
         self._ctx = zmq.Context.instance()
         self._sock = self._ctx.socket(zmq.PUB)
+        self._sock.setsockopt(zmq.SNDHWM, 10)  # limit send buffer for large payloads
         self._sock.connect(f"tcp://{host}:{port}")
         # Give the slow-joiner a moment to let subscriptions propagate
         time.sleep(0.01)

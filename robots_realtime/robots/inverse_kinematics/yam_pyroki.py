@@ -2,7 +2,7 @@
 Bimanual YAM arms Inverse Kinematics Example using PyRoki with ViserAbstractBase.
 """
 
-from copy import deepcopy
+import os
 from typing import Literal, Optional
 
 import numpy as np
@@ -10,9 +10,27 @@ import pyroki as pk
 import viser
 import viser.extras
 import viser.transforms as vtf
+import yourdfpy
 
 from robots_realtime.robots.inverse_kinematics.pyroki_snippets._solve_ik import solve_ik
 from robots_realtime.robots.viser.viser_base import TransformHandle, ViserAbstractBase
+
+
+def _load_yam_urdf() -> yourdfpy.URDF:
+    """Load a fresh YAM URDF instance (avoids deepcopy issues with dict_keys)."""
+    current_path = os.path.dirname(os.path.abspath(__file__))
+    urdf_path = os.path.join(
+        current_path, "..", "..", "..", "dependencies", "i2rt", "i2rt",
+        "robot_models", "arm", "yam", "yam.urdf",
+    )
+    mesh_dir = os.path.join(
+        current_path, "..", "..", "..", "dependencies", "i2rt", "i2rt",
+        "robot_models", "arm", "yam", "assets",
+    )
+    return yourdfpy.URDF.load(
+        urdf_path, mesh_dir=mesh_dir,
+        build_collision_scene_graph=False, load_collision_meshes=False,
+    )
 
 
 class YamPyroki(ViserAbstractBase):
@@ -46,7 +64,7 @@ class YamPyroki(ViserAbstractBase):
             self.base_frame_right = self.viser_server.scene.add_frame("/base/base_right", show_axes=False)
             self.base_frame_right.position = (0.0, -0.61, 0.0)
             self.urdf_vis_right = viser.extras.ViserUrdf(
-                self.viser_server, deepcopy(self.urdf), root_node_name="/base/base_right"
+                self.viser_server, _load_yam_urdf(), root_node_name="/base/base_right"
             )
 
     def _setup_solver_specific(self):

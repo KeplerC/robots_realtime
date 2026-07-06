@@ -1,0 +1,50 @@
+{
+  "visual_mesh": "new_rack.obj",
+  "collision_meshes": [
+    "new_rack_collision_0.obj",
+    "new_rack_collision_1.obj",
+    "new_rack_collision_2.obj",
+    "new_rack_collision_3.obj",
+    "new_rack_collision_4.obj",
+    "new_rack_collision_5.obj",
+    "new_rack_collision_6.obj",
+    "new_rack_collision_7.obj",
+    "new_rack_collision_8.obj",
+    "new_rack_collision_9.obj",
+    "new_rack_collision_10.obj",
+    "new_rack_collision_11.obj",
+    "new_rack_collision_12.obj",
+    "new_rack_collision_13.obj",
+    "new_rack_collision_14.obj",
+    "new_rack_collision_15.obj",
+    "new_rack_collision_16.obj",
+    "new_rack_collision_17.obj",
+    "new_rack_collision_18.obj",
+    "new_rack_collision_19.obj",
+    "new_rack_collision_20.obj",
+    "new_rack_collision_21.obj",
+    "new_rack_collision_22.obj",
+    "new_rack_collision_23.obj",
+    "new_rack_collision_24.obj",
+    "new_rack_collision_25.obj",
+    "new_rack_collision_26.obj",
+    "new_rack_collision_27.obj",
+    "new_rack_collision_28.obj",
+    "new_rack_collision_29.obj",
+    "new_rack_collision_30.obj",
+    "new_rack_collision_31.obj",
+    "new_rack_collision_32.obj",
+    "new_rack_collision_33.obj",
+    "new_rack_collision_34.obj",
+    "new_rack_collision_35.obj",
+    "new_rack_collision_36.obj"
+  ],
+  "visual_submeshes": [
+    {
+      "mesh_file": "new_rack_visual_0.obj",
+      "texture_file": "new_rack_visual_0.png",
+      "material_name": "new_rack_mat_0"
+    }
+  ],
+  "mesh_scale": 0.5653
+}

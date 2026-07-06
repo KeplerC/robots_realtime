@@ -1,0 +1,42 @@
+{
+  "visual_mesh": "yellow_tape.obj",
+  "collision_meshes": [
+    "yellow_tape_collision_0.obj",
+    "yellow_tape_collision_1.obj",
+    "yellow_tape_collision_2.obj",
+    "yellow_tape_collision_3.obj",
+    "yellow_tape_collision_4.obj",
+    "yellow_tape_collision_5.obj",
+    "yellow_tape_collision_6.obj",
+    "yellow_tape_collision_7.obj",
+    "yellow_tape_collision_8.obj",
+    "yellow_tape_collision_9.obj",
+    "yellow_tape_collision_10.obj",
+    "yellow_tape_collision_11.obj",
+    "yellow_tape_collision_12.obj",
+    "yellow_tape_collision_13.obj",
+    "yellow_tape_collision_14.obj",
+    "yellow_tape_collision_15.obj",
+    "yellow_tape_collision_16.obj",
+    "yellow_tape_collision_17.obj",
+    "yellow_tape_collision_18.obj",
+    "yellow_tape_collision_19.obj",
+    "yellow_tape_collision_20.obj",
+    "yellow_tape_collision_21.obj",
+    "yellow_tape_collision_22.obj",
+    "yellow_tape_collision_23.obj",
+    "yellow_tape_collision_24.obj",
+    "yellow_tape_collision_25.obj",
+    "yellow_tape_collision_26.obj",
+    "yellow_tape_collision_27.obj",
+    "yellow_tape_collision_28.obj",
+    "yellow_tape_collision_29.obj"
+  ],
+  "visual_submeshes": [
+    {
+      "mesh_file": "yellow_tape_visual_0.obj",
+      "texture_file": "yellow_tape_visual_0.png",
+      "material_name": "yellow_tape_mat_0"
+    }
+  ]
+}

@@ -9,6 +9,7 @@
 *.pyzw
 *.pyzwz
 *.png
+!robots_realtime/sim/eyeball/assets/**/*.png
 __pycache__/
 .venv/
 .ruff_cache/

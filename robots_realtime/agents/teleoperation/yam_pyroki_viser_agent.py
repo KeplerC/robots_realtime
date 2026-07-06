@@ -1,6 +1,5 @@
 import threading
 import time
-from copy import deepcopy
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -9,7 +8,7 @@ import viser.extras
 from dm_env.specs import Array
 
 from robots_realtime.agents.agent import Agent
-from robots_realtime.robots.inverse_kinematics.yam_pyroki import YamPyroki
+from robots_realtime.robots.inverse_kinematics.yam_pyroki import YamPyroki, _load_yam_urdf
 from robots_realtime.sensors.cameras.camera_utils import obs_get_rgb, resize_with_pad
 
 
@@ -32,7 +31,7 @@ class YamPyrokiViserAgent(Agent):
         self.base_frame_left_real = self.viser_server.scene.add_frame("/base_left_real", show_axes=False)
         self.urdf_vis_left_real = viser.extras.ViserUrdf(
             self.viser_server,
-            deepcopy(self.ik.urdf),
+            _load_yam_urdf(),
             root_node_name="/base_left_real",
             mesh_color_override=(0.8, 0.5, 0.5),
         )
@@ -51,7 +50,7 @@ class YamPyrokiViserAgent(Agent):
             self.base_frame_right_real.position = self.ik.base_frame_right.position
             self.urdf_vis_right_real = viser.extras.ViserUrdf(
                 self.viser_server,
-                deepcopy(self.ik.urdf),
+                _load_yam_urdf(),
                 root_node_name="/base_left_real/base_right_real",
                 mesh_color_override=(0.8, 0.5, 0.5),
             )
@@ -83,7 +82,7 @@ class YamPyrokiViserAgent(Agent):
             time.sleep(0.02)
 
     def act(self, obs: Dict[str, Any]) -> Any:
-        self.obs = deepcopy(obs)
+        self.obs = dict(obs)
 
         action = {
             "left": {

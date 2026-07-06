@@ -1,19 +1,19 @@
 <mujoco model="yam_v0">
   <compiler angle="radian" meshdir="assets"/>
 
-  <option integrator="implicitfast"/>
+  <option integrator="implicitfast" timestep="0.0005" solver="Newton" iterations="30" cone="elliptic" noslip_iterations="10"/>
 
   <default>
     <default class="yam">
       <position inheritrange="1"/>
-      <joint frictionloss="0.1" axis="0 0 1"/>
+      <joint frictionloss="0.01" damping="0.5" axis="0 0 1"/>
       <default class="dm4340">
         <joint armature="0.032"/>
-        <position kp="40" kv="2.5" forcerange="-28 28"/>
+        <position kp="80" kv="6" forcerange="-28 28"/>
       </default>
       <default class="dm4310">
         <joint armature="0.0018"/>
-        <position kp="10" kv="1" forcerange="-10 10"/>
+        <position kp="30" kv="2" forcerange="-10 10"/>
       </default>
       <default class="visual">
         <geom type="mesh" contype="0" conaffinity="0" density="0" group="2" material="black"/>
@@ -59,7 +59,7 @@
     <body name="arm" childclass="yam">
       <geom class="visual" pos="0 0 -0.0006" quat="1 0 0 1" mesh="model2"/>
       <geom class="collision" size="0.033 0.01" pos="0.0 0.0 0.026" quat="1 0 0 0"/>
-      <body name="link_1" pos="0 0 0.0631" quat="1 0 0 1">
+      <body name="link_1" pos="0 0 0.0631" quat="1 0 0 1" gravcomp="1">
         <inertial pos="-0.00192861 -0.00795735 0.0208176" quat="0.297851 0.642634 0.360045 0.607185" mass="0.12415"
           diaginertia="0.000180751 0.000145532 5.89179e-05"/>
         <joint name="joint1" range="-2.61799 3.05433" class="dm4340"/>
@@ -186,7 +186,7 @@
     <position name="joint1" joint="joint1" class="dm4340"/>
     <position name="joint2" joint="joint2" class="dm4340"/>
     <position name="joint3" joint="joint3" class="dm4340"/>
-    <position name="joint4" joint="joint4" class="dm4310" kp="20" kv=".5"/>
+    <position name="joint4" joint="joint4" class="dm4310"/>
     <position name="joint5" joint="joint5" class="dm4310"/>
     <position name="joint6" joint="joint6" class="dm4310"/>
     <position class="finger" name="gripper" joint="left_finger"/>

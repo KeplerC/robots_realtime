@@ -67,10 +67,10 @@ class ViserAbstractBase(ABC):
             # current path
             current_path = os.path.dirname(os.path.abspath(__file__))
             urdf_path = os.path.join(
-                current_path, "..", "..", "..", "dependencies", "i2rt", "i2rt", "robot_models", "yam", "yam.urdf"
+                current_path, "..", "..", "..", "dependencies", "i2rt", "i2rt", "robot_models", "arm", "yam", "yam.urdf"
             )
             mesh_dir = os.path.join(
-                current_path, "..", "..", "..", "dependencies", "i2rt", "i2rt", "robot_models", "yam", "assets"
+                current_path, "..", "..", "..", "dependencies", "i2rt", "i2rt", "robot_models", "arm", "yam", "assets"
             )
             self.urdf = yourdfpy.URDF.load(
                 urdf_path,
