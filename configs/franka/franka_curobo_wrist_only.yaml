@@ -1,0 +1,49 @@
+# Franka + CuRobo bridge — WRIST CAMERA ONLY.
+#
+# Fork of franka_curobo_all_cam.yaml with the `camera_top` CameraNode
+# removed. Streaming one ZED instead of two halves the bridge-side GPU
+# footprint (each ZED runs a NEURAL_PLUS depth net costing ~0.7-1 GB),
+# leaving room for SAM3 + GroundingDINO + CuRobo on an 8 GB GPU.
+#
+# Pair with examples/libero_pro/full_popcorn_cycle/task_real.yaml, which
+# declares environment.cameras: [robot0_eye_in_hand]. franka_real_env
+# maps the wire key `camera_wrist` -> vOS `robot0_eye_in_hand` by role.
+
+version: "1"
+
+session:
+  save_root: recordings
+
+nodes:
+  - type: ViserTeleopNode
+    name: franka_viser
+    agent_class: robots_realtime.agents.client.franka_osc_client_cartesian:FrankaOscClientCartesianAgent
+    agent_kwargs:
+      viser_port: 8765
+      robotiq_gripper: true
+      visualize_rgbd: true
+      wrist_cam_key: camera_wrist
+      wrist_cam_extrinsic_file: /home/r2d2/graph-as-policy/outputs/franka_wrist_camera_extrinsic.json
+      client_host: "127.0.0.1"
+      client_port: 9001
+      debug_msgpack: true
+      hold_on_empty_response: true
+    arm_key: left
+    viz_freq: 20.0
+    state_topics:
+      left: franka/joint_state
+    image_topics:
+      camera_wrist: camera_wrist/rgb
+
+  - type: RobotNode
+    name: franka
+    robot_config: robot_configs/franka/franka_robotiq_gripper.yaml
+    cmd_topic: franka_viser/joint_pos
+    poll_freq: 100.0
+
+  - type: CameraNode
+    name: camera_wrist
+    driver: ZedCamera
+    stream_ip: "10.65.87.121"
+    enable_depth: true
+    resolution: HD720

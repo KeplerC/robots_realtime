@@ -6,7 +6,7 @@ session:
 nodes:
   - type: ViserTeleopNode
     name: franka_viser
-    agent_class: robots_realtime.agents.client.franka_osc_client_cartesian:FrankaOscClientCartesianAgent
+    agent_class: robots_realtime.agents.client.franka_osc_client_cartesian_confirm:FrankaOscClientCartesianConfirmAgent
     agent_kwargs:
       viser_port: 8765
       ik_rate: 100.0
@@ -25,8 +25,7 @@ nodes:
   - type: RobotNode
     name: franka
     robot_config: robot_configs/franka/franka_robotiq_gripper.yaml
-    cmd_topic: franka_viser/left_joint_pos
-    poll_freq: 500
+    cmd_topic: franka_viser/joint_pos
 
   - type: CameraNode
     name: camera_top

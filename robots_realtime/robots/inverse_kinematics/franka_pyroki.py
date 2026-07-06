@@ -123,8 +123,40 @@ class FrankaPyroki(ViserAbstractBase):
     def _setup_gui(self) -> None:
         super()._setup_gui()
         self.timing_handle_left = self.viser_server.gui.add_number("Left Arm Time (ms)", 0.01, disabled=True)
+        self.left_target_update_handle = self.viser_server.gui.add_number(
+            "Left Target Updates", 0, disabled=True
+        )
         if self.bimanual:
             self.timing_handle_right = self.viser_server.gui.add_number("Right Arm Time (ms)", 0.01, disabled=True)
+
+    def _setup_transform_handles(self) -> None:
+        super()._setup_transform_handles()
+
+        left_handle = self.transform_handles.get("left")
+        left_control = left_handle.control if left_handle is not None else None
+        if left_control is not None:
+
+            @left_control.on_update
+            def _(_event) -> None:  # type: ignore[misc]
+                self.left_target_update_handle.value += 1
+                print(
+                    "[franka_pyroki] target_left update "
+                    f"#{self.left_target_update_handle.value}: "
+                    f"pos={np.asarray(left_control.position)} "
+                    f"wxyz={np.asarray(left_control.wxyz)}",
+                    flush=True,
+                )
+
+            nudge_button = self.viser_server.gui.add_button("Nudge Target +X")
+
+            @nudge_button.on_click
+            def _(_event) -> None:  # type: ignore[misc]
+                left_control.position = tuple(np.asarray(left_control.position) + np.array([0.03, 0.0, 0.0]))
+                print(
+                    "[franka_pyroki] nudge target +X: "
+                    f"pos={np.asarray(left_control.position)}",
+                    flush=True,
+                )
 
     def _initialize_transform_handles(self) -> None:
         default_position = (0.45, 0.0, 0.25)
@@ -191,6 +223,27 @@ class FrankaPyroki(ViserAbstractBase):
         self.urdf_vis_left.update_cfg(self.joints["left"])
         if self.bimanual:
             self.urdf_vis_right.update_cfg(self.joints["right"])  # type: ignore[attr-defined]
+
+    def sync_to_joint_pos(self, joint_pos: np.ndarray, side: str = "left") -> None:
+        """Initialize Viser state and target controls from measured joints."""
+        joint_pos = np.asarray(joint_pos, dtype=float)
+        cfg = joint_pos[: self.joint_count].copy()
+        if cfg.shape[0] != self.joint_count:
+            return
+
+        self.joints[side] = cfg
+        self.urdf.update_cfg(dict(zip(self.urdf.actuated_joint_names, cfg, strict=False)))
+        target_idx = 0 if side == "left" else 1
+        target_tf = vtf.SE3.from_matrix(self.urdf.get_transform(self.target_link_names[target_idx], "panda_link0"))
+
+        handle = self.transform_handles.get(side)
+        if handle is not None and handle.control is not None:
+            tcp_offset_tf = vtf.SE3(np.array([*handle.tcp_offset_frame.wxyz, *handle.tcp_offset_frame.position]))
+            control_tf = target_tf @ tcp_offset_tf.inverse()
+            handle.control.wxyz = control_tf.rotation().wxyz
+            handle.control.position = control_tf.translation()
+
+        self.update_visualization()
 
     def home(self) -> None:
         if self.rest_pose is None:

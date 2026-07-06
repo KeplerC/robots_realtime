@@ -100,6 +100,16 @@ class SyncMsgpackNumpyClient:
         self._retry_interval = retry_interval
         self._timeout = timeout
         self._loop = asyncio.new_event_loop()
+        self._connected = False
+
+    def _ensure_connected(self):
+        if not self._connected:
+            self._loop.run_until_complete(self._client.connect())
+            self._connected = True
+
+    def send_request(self, data: dict) -> dict:
+        self._ensure_connected()
+        return self._loop.run_until_complete(self._client.send_request(data))
         asyncio.set_event_loop(self._loop)
         self._client = MsgpackNumpyClient(host, port)
         self._connect_with_retry()

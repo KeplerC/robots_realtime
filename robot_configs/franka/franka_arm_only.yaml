@@ -2,10 +2,12 @@ _target_: robots_realtime.robots.robot.ConcatenatedRobot
 robots:
   - _target_: robots_realtime.robots.franka_osc.FrankaPanda
     host_name: "172.16.0.1"
+    enable_gripper: false  # Robotiq gripper handled separately
     load_mass: 0.9
     load_com: [0.0, 0.0, 0.06]
     load_inertia: [0.001, 0.0, 0.0, 0.0, 0.001, 0.0, 0.0, 0.0, 0.001]
-  # mock a fake gripper
-  - _target_: robots_realtime.robots.robot.PrintRobot
-    num_dofs: 1
-    dont_print: true
+
+  - _target_: robots_realtime.robots.robotiq_gripper.RobotiqGripperRobot
+    port: "/dev/ttyUSB0"
+    default_speed: 255
+    default_force: 40

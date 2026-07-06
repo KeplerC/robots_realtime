@@ -6,14 +6,17 @@ session:
 nodes:
   - type: ViserTeleopNode
     name: franka_viser
-    agent_class: robots_realtime.agents.client.franka_osc_client_cartesian:FrankaOscClientCartesianAgent
+    agent_class: robots_realtime.agents.client.franka_osc_client_cartesian_confirm:FrankaOscClientCartesianConfirmAgent
     agent_kwargs:
       viser_port: 8765
       ik_rate: 100.0
       robotiq_gripper: true
-      visualize_rgbd: false
+      visualize_rgbd: true
       client_host: "0.0.0.0"
       client_port: 9001
+      hold_on_empty_response: true
+      wrist_cam_key: camera_wrist
+      wrist_cam_extrinsic_file: /home/r2d2/graph-as-policy/outputs/franka_wrist_camera_extrinsic.json
     arm_key: left
     ik_freq: 100.0
     viz_freq: 20.0
@@ -21,12 +24,12 @@ nodes:
       left: franka/joint_state
     image_topics:
       camera_top: camera_top/rgb
+      camera_wrist: camera_wrist/rgb
 
   - type: RobotNode
     name: franka
     robot_config: robot_configs/franka/franka_robotiq_gripper.yaml
-    cmd_topic: franka_viser/left_joint_pos
-    poll_freq: 500
+    cmd_topic: franka_viser/joint_pos
 
   - type: CameraNode
     name: camera_top
@@ -36,3 +39,10 @@ nodes:
     fps: 30
     enable_depth: true
     extrinsics_file: configs/camera_extrinsics/autolab_franka_zed_top.yaml
+
+  - type: CameraNode
+    name: camera_wrist
+    driver: ZedCamera
+    stream_ip: "10.65.87.121"
+    enable_depth: true
+    resolution: HD720

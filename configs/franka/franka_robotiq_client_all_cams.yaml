@@ -11,7 +11,7 @@ nodes:
       viser_port: 8765
       ik_rate: 100.0
       robotiq_gripper: true
-      visualize_rgbd: false
+      visualize_rgbd: true
       client_host: "0.0.0.0"
       client_port: 9001
     arm_key: left
@@ -21,12 +21,12 @@ nodes:
       left: franka/joint_state
     image_topics:
       camera_top: camera_top/rgb
+      camera_wrist: camera_wrist/rgb
 
   - type: RobotNode
     name: franka
     robot_config: robot_configs/franka/franka_robotiq_gripper.yaml
-    cmd_topic: franka_viser/left_joint_pos
-    poll_freq: 500
+    cmd_topic: franka_viser/joint_pos
 
   - type: CameraNode
     name: camera_top
@@ -36,3 +36,10 @@ nodes:
     fps: 30
     enable_depth: true
     extrinsics_file: configs/camera_extrinsics/autolab_franka_zed_top.yaml
+
+  - type: CameraNode
+    name: camera_wrist
+    driver: ZedCamera
+    stream_ip: "10.65.87.121"
+    enable_depth: true
+    resolution: HD720

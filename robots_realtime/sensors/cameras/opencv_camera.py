@@ -99,4 +99,4 @@ if __name__ == "__main__":
     while True:
         data = camera.read()
         print(data)
-            time.sleep(1 / camera.fps)
+        time.sleep(1 / camera.fps)
